@@ -1,0 +1,72 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Resources\Khi Player Thumbnail.bmp" />
+    <None Remove="Resources\Khi Player.png" />
+    <None Remove="Resources\Khi-Player-Icon.ico" />
+    <None Remove="Resources\Loop Dark Mode.png" />
+    <None Remove="Resources\Loop Single Dark Mode.png" />
+    <None Remove="Resources\Loop Single Light Mode.png" />
+    <None Remove="Resources\loop.png" />
+    <None Remove="Resources\MusicArt-NoCover.png" />
+    <None Remove="Resources\Play-Pause  Dark Mode.png" />
+    <None Remove="Resources\Play-Pause.png" />
+    <None Remove="Resources\Previous Dark Mode.png" />
+    <None Remove="Resources\Previous.png" />
+    <None Remove="Resources\Shuffle Dark Mode.png" />
+    <None Remove="Resources\Shuffle Light Mode.png" />
+    <None Remove="Resources\Skip Dark Mode.png" />
+    <None Remove="Resources\Skip.png" />
+    <None Remove="Resources\Stop Dark Mode.png" />
+    <None Remove="Resources\Stop Light Mode.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Khi Player Thumbnail.bmp" />
+    <EmbeddedResource Include="Resources\Khi Player.png" />
+    <EmbeddedResource Include="Resources\Khi-Player-Icon.ico" />
+    <EmbeddedResource Include="Resources\Loop Dark Mode.png" />
+    <EmbeddedResource Include="Resources\Loop Single Dark Mode.png" />
+    <EmbeddedResource Include="Resources\Loop Single Light Mode.png" />
+    <EmbeddedResource Include="Resources\loop.png" />
+    <EmbeddedResource Include="Resources\MusicArt-NoCover.png" />
+    <EmbeddedResource Include="Resources\Play-Pause  Dark Mode.png" />
+    <EmbeddedResource Include="Resources\Play-Pause.png" />
+    <EmbeddedResource Include="Resources\Previous Dark Mode.png" />
+    <EmbeddedResource Include="Resources\Previous.png" />
+    <EmbeddedResource Include="Resources\Shuffle Dark Mode.png" />
+    <EmbeddedResource Include="Resources\Shuffle Light Mode.png" />
+    <EmbeddedResource Include="Resources\Skip Dark Mode.png" />
+    <EmbeddedResource Include="Resources\Skip.png" />
+    <EmbeddedResource Include="Resources\Stop Dark Mode.png" />
+    <EmbeddedResource Include="Resources\Stop Light Mode.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="TagLibSharp" Version="2.3.0" />
+    <PackageReference Include="WindowsAPICodePackShell" Version="8.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>

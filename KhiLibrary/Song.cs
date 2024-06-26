@@ -3,6 +3,10 @@ using TagLib;
 
 namespace KhiLibrary
 {
+    /// <summary>
+    /// An object containing an audio file's information (title, artist, album, location, duration, genres, lyrics, 
+    /// art, thumbnail)
+    /// </summary>
     public class Song
     {
         private string title;
@@ -486,7 +490,7 @@ namespace KhiLibrary
                     {
                         artistsTag.Tag.Performers = newArtists;
                         artistsTag.Save();
-                        tempConcatedArtists = KhiUtils.SongInfoTools.GetArtist(artistsTag.Tag).Result;
+                        tempConcatedArtists = KhiUtils.SongInfoTools.GetArtist(artistsTag).Result;
                         return tempConcatedArtists;
                     }
                 }
@@ -555,7 +559,7 @@ namespace KhiLibrary
                     {
                         genresTag.Tag.Genres = newGenres;
                         genresTag.Save();
-                        tempConcatedGenres = KhiUtils.SongInfoTools.GetGenres(genresTag.Tag).Result;
+                        tempConcatedGenres = KhiUtils.SongInfoTools.GetGenres(genresTag).Result;
                         return tempConcatedGenres;
                     }
                 }

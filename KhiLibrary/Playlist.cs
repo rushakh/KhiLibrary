@@ -102,13 +102,15 @@ namespace KhiLibrary
                 playlistPath = Application.StartupPath + name + ".xml";
                 creationDate = DateTime.Now;
                 lastUpdated = DateTime.Now;
+                songsList = new Songs(playlistName, playlistPath);
                 CreatePlaylist();
                 Indexer();
-                songsList = new Songs();
+                
             }
             else
             {
                 // add code to load a previously constructed playlist or throw exception or sth like that
+                // Check to see if a playlist with that name exists, gets its path and loads it if there is.
                 var tempSongList = KhiUtils.PlaylistTools.PlaylistReader(name);
                 if (tempSongList != null)
                 {

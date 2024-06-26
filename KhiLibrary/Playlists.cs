@@ -7,9 +7,11 @@
 
         public int Count { get => playlistsList.Count; }
 
+        public List<Playlist> PlaylistsList { get => playlistsList; }
+
         public Playlists()
         {
-            playlistsList = [];
+            playlistsList = new List<Playlist>();
         }
 
         #region instanceMethods
@@ -94,7 +96,13 @@
             if (KhiUtils.PlaylistTools.IsAcceptablePlaylistName(playlistName))
             {
                 Playlist newPlaylist = new(playlistName);
-                playlistsList.Add(newPlaylist);
+                if (playlistsList != null) { playlistsList.Add(newPlaylist); }
+                else
+                { 
+                    playlistsList = new List<Playlist>();
+                    playlistsList.Add(newPlaylist);
+                }
+                
             }
             else
             { throw new Exception("Invalid Playlist Name"); }

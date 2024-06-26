@@ -182,19 +182,29 @@ namespace KhiLibrary
         {
             await Task.Run(() =>
             {
-                List<Song> tempSongs = [];
+                List<Song> tempSongs = new List<Song>();
                 foreach (string audioPath in audioPaths)
                 {
                     Song newSong = new(audioPath);
                     tempSongs.Add(newSong);
                 }
-                tempSongs = KhiUtils.DataFilteringTools.FilterDuplicates(tempSongs, ownerPlaylistPath);
-                if (tempSongs.Count > 0)
+                List <Song> checkedSongs  = KhiUtils.DataFilteringTools.FilterDuplicates(tempSongs, ownerPlaylistPath);
+                if (checkedSongs.Count > 0)
                 {
-                    songs.AddRange(tempSongs);
+                    foreach (Song song in checkedSongs)
+                    {
+                        songs.Add(song);
+                    }
+                    //songs.AddRange(tempSongs);
                     songsListLastUpdated = DateTime.Now;
-                    KhiUtils.PlaylistTools.PlaylistWriter(ownerPlaylistPath, ownerPlaylistName, tempSongs);
+                    KhiUtils.PlaylistTools.PlaylistWriter(ownerPlaylistPath, ownerPlaylistName, checkedSongs);
                     calculateTotallPlaytime();
+                }
+                // Better to do nothing, since they already exist in the playlist, no need for an Exception to be thrown.
+                else 
+                {
+                    //Exception duplicateOrEmpty = new Exception("Duplicate files / Empty list");
+                    //throw duplicateOrEmpty; 
                 }
             });
         }
@@ -205,7 +215,7 @@ namespace KhiLibrary
         public void Clear()
         {
             songs.Clear();
-            calculateTotallPlaytime();
+            songsListTotalPlaytime = TimeSpan.Zero;
         }
 
         /// <summary>
@@ -344,9 +354,12 @@ namespace KhiLibrary
         private TimeSpan calculateTotallPlaytime()
         {
             TimeSpan tempTotal = TimeSpan.Zero;
-            foreach (Song music in songs)
+            if (songs != null && songs.Count > 0)
             {
-                tempTotal += music.Duration;
+                foreach (Song music in songs)
+                {
+                    tempTotal += music.Duration;
+                }
             }
             return tempTotal;
         }

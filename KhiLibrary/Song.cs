@@ -175,7 +175,6 @@ namespace KhiLibrary
             lyrics = string.Empty;
             art = null;
             thumbnail = null;
-
             Indexer();
         }
 
@@ -341,12 +340,12 @@ namespace KhiLibrary
         {
             try
             {
-                Image tempImage;
-                using (System.IO.FileStream imageStream = new(imagePath, FileMode.Open))
+                Image artOrThumbnail;
+                using (var tempbmp = new Bitmap(imagePath))
                 {
-                    tempImage = (Image)Image.FromStream(imageStream).Clone();
+                    artOrThumbnail = new Bitmap(tempbmp);
                 }
-                return tempImage;
+                return artOrThumbnail;
             }
             catch
             {
@@ -406,7 +405,8 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Use to embedd lyrics into the song. WILL NOT WORK in case the file is in use.
+        /// Use to embedd lyrics into the song. WILL NOT WORK in case the file is in use. Returns the song's lyrics in case of success,
+        /// returns empty string otherwise. 
         /// </summary>
         /// <param name="newLyrics"></param>
         /// <returns></returns>
@@ -428,9 +428,7 @@ namespace KhiLibrary
             }
             catch
             {
-                //System.Windows.Forms.MessageBox.Show("Could Not Edit / Read File");
                 return string.Empty;
-                //throw;
             }
         }
 

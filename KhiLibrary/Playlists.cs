@@ -1,5 +1,8 @@
 ﻿namespace KhiLibrary
 {
+    /// <summary>
+    /// An object containing a collection of Playlist objects.
+    /// </summary>
     public class Playlists
     {
         //private int count;
@@ -9,9 +12,16 @@
 
         public List<Playlist> PlaylistsList { get => playlistsList; }
 
-        public Playlists()
+        /// <summary>
+        /// Constructs an empty collection to contain Playlist objects.
+        /// </summary>
+        public Playlists(bool loadExistingPlaylists = false)
         {
             playlistsList = new List<Playlist>();
+            if (loadExistingPlaylists) 
+            {
+                LoadExistingDatabases();
+            }           
         }
 
         #region instanceMethods
@@ -101,8 +111,7 @@
                 { 
                     playlistsList = new List<Playlist>();
                     playlistsList.Add(newPlaylist);
-                }
-                
+                }              
             }
             else
             { throw new Exception("Invalid Playlist Name"); }

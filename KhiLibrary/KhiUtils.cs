@@ -8,6 +8,9 @@ using TagLib;
 
 namespace KhiLibrary
 {
+    /// <summary>
+    /// Contains the methods needed to process audio files' data, tools for playlists and data filtering
+    /// </summary>
     public class KhiUtils
     {
         private static readonly string applicationPath = Application.StartupPath;
@@ -16,7 +19,9 @@ namespace KhiLibrary
         private static readonly string albumArtsPath = applicationPath + "\\Album Arts\\";
         private static readonly string albumArtsThumbnailsPath = applicationPath + "Album Arts Thumbnails\\";
         
-
+        /// <summary>
+        /// Contains methods used by Playlist class and up for reading, writing, and editing playlists.
+        /// </summary>
         public class PlaylistTools
         {
             /// <summary>
@@ -89,14 +94,19 @@ namespace KhiLibrary
                     playlists = new XElement("playlists");
                     records.Add(playlists);
                 }
-                // Creating the elements
-                // Each element's will contain a child, the playlistPath
-                // The elements name will be the same as the playlist's name
-                XElement newPlaylist = new(playlistName, playlistPath);
-                // We then Add it to the root document
-                playlists.Add(newPlaylist);
-                // Saves the Document
-                XmlWritingTool(records, PlaylistsRecord);
+                // First will have to check if it already exists, if it doesn't will add it, if it does, will do nothing.
+                if (GetPlaylistPath(playlistName) == null)
+                {
+                    // Creating the elements
+                    // Each element's will contain a child, the playlistPath
+                    // The elements name will be the same as the playlist's name
+                    XElement newPlaylist = new(playlistName, playlistPath);
+                    // We then Add it to the root document
+                    playlists.Add(newPlaylist);
+                    // Saves the Document
+                    XmlWritingTool(records, PlaylistsRecord);
+                }
+                
             }
 
             /// <summary>
@@ -116,27 +126,23 @@ namespace KhiLibrary
                         if (playlists.HasElements)
                         {
                             // Will add all of the elements to a dictionary, the element name is the playlistName, while its child is the playlistPath
-                            var tempAllPlaylists = playlists.Descendants();
+                            var tempAllPlaylists = playlists.Elements();
                             foreach (XElement playlist in tempAllPlaylists)
                             {
                                 try
                                 {
-                                    playlistsDic.Add(playlist.Name.ToString(), playlist.Elements().First().Value);
+                                    playlistsDic.Add(playlist.Name.LocalName, playlist.Value);
                                 }
                                 catch { }
-                            }
-                            if (playlistsDic.Count > 0)
-                            {
-                                return playlistsDic;
-                            }
-                            else { return null; }
+                            }                            
                         }
-                        else { return null; }
+                        else { playlistsDic = null; }
                     }
                     // If there is no root element, then there are no playlists, returns null
-                    else { return null; }
+                    else { playlistsDic = null; }
                 }
-                else { return null; }
+                else { playlistsDic = null; }
+                return playlistsDic;
             }
 
             /// <summary>
@@ -486,7 +492,8 @@ namespace KhiLibrary
             {
                 bool isAcceptable = false;
                 var temp = System.IO.Path.GetExtension(audioFilePath).Trim().ToLower();
-                if (temp == ".mp3" || temp == ".wav" || temp == ".flac" || temp == ".aiff" || temp == ".wma" || temp == ".pcm" || temp == ".aac" || temp == ".oog" || temp == ".alac")
+                if (temp == ".mp3" || temp == ".wav" || temp == ".flac" || temp == ".aiff" || temp == ".wma" || 
+                    temp == ".pcm" || temp == ".aac" || temp == ".oog" || temp == ".alac" || temp == ".m4a")
                 { isAcceptable = true; }
                 return isAcceptable;
             }
@@ -621,20 +628,16 @@ namespace KhiLibrary
                             //var tempTags = musicTags.Tag;
                             songPath = audioFilePath;
                             // For title
-                            //songTitle = await GetTitle(tempTags, audioFilePath);
                             songTitle =  await GetTitle(musicTags, audioFilePath);
                             // For artists
-                            //songArtist = await GetArtist(tempTags);
                             songArtist = await GetArtist(musicTags);
                             // For Album, if it is mentioned, returns it, otherwise, an empty string is returned.
                             if (musicTags.Tag.Album == null) { songAlbum = string.Empty; }
                             else { songAlbum = (string)musicTags.Tag.Album.Clone(); }
                             // For duration
                             var time = musicTags.Properties.Duration.Duration();
-                            //var time = TimeSpan.Parse(musicTags.Tag.Length, new CultureInfo("en-US"));
                             songDuration = time;
                             // For genres
-                            //songGenres = await GetGenres(tempTags);
                             songGenres = await GetGenres(musicTags);
                             // For lyrics
                             var temp = musicTags.Tag.Lyrics;
@@ -655,7 +658,7 @@ namespace KhiLibrary
                             songInfo[5] = songThumbnailPath;
                             songInfo[6] = songGenres;
                             songInfo[7] = songLyrics;
-                            //musicTags.Dispose();
+                            musicTags.Dispose();
                             return (songInfo, songDuration);
                         }
                     }
@@ -988,22 +991,22 @@ namespace KhiLibrary
                     // Using local variables because there is no need to have the images in memory. It's better and less memory expensive
                     // to load them when they are needed
                     Image art;
-                    //, thumbnail;
-                    //static bool ThumbnailCallback() { return false; }
-
                     MemoryStream picConverter = new();
                     if (embeddedImages.Length > 0)
                     {
                         picConverter = new MemoryStream(embeddedImages[0].Data.Data);
-                        if (!picConverter.CanRead || !picConverter.CanWrite || embeddedImages[0].Type == TagLib.PictureType.NotAPicture)
+                        if (picConverter == null || !picConverter.CanRead || !picConverter.CanWrite || embeddedImages[0].Type == TagLib.PictureType.NotAPicture)
                         {
                             art = Resources.Khi_Player;
-                            //thumbnail = Resources.Khi_Player_Thumbnail;
                         }
                         else
                         {
-                            art = (Image)Image.FromStream(picConverter).Clone();
-                            //thumbnail = (Image)art.GetThumbnailImage(60, 60, ()=> false, IntPtr.Zero).Clone();
+                            try
+                            {
+                                var tempArt = Image.FromStream(picConverter);
+                                art = (Image)tempArt.Clone();
+                            }
+                            catch { art = art = Resources.Khi_Player; }
                         }
                     }
                     else
@@ -1051,7 +1054,10 @@ namespace KhiLibrary
                     // For getting the Image and thumbnail
                     if (tempArt != null)
                     {
-                        art = (Image)tempArt.Bitmap.Clone();
+                        using (var tempbmp = new Bitmap(tempArt.Bitmap))
+                        {
+                            art = new Bitmap(tempbmp);
+                        }
                     }
                     // If the ShellFile is null, uses the default KhiPlayer image nad thumbnail.
                     else

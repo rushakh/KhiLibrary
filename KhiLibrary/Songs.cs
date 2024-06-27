@@ -198,7 +198,7 @@ namespace KhiLibrary
                     //songs.AddRange(tempSongs);
                     songsListLastUpdated = DateTime.Now;
                     KhiUtils.PlaylistTools.PlaylistWriter(ownerPlaylistPath, ownerPlaylistName, checkedSongs);
-                    calculateTotallPlaytime();
+                    calculateTotallPlaytime();                   
                 }
                 // Better to do nothing, since they already exist in the playlist, no need for an Exception to be thrown.
                 else 
@@ -206,6 +206,7 @@ namespace KhiLibrary
                     //Exception duplicateOrEmpty = new Exception("Duplicate files / Empty list");
                     //throw duplicateOrEmpty; 
                 }
+                tempSongs.Clear();
             });
         }
 

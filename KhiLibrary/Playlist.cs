@@ -4,6 +4,9 @@ using Application = System.Windows.Forms.Application;
 
 namespace KhiLibrary
 {
+    /// <summary>
+    /// An Object containing a playlist and its songs.
+    /// </summary>
     public class Playlist
     {
         // *** Add method for Reading database either here or in MusicLibrary
@@ -261,7 +264,6 @@ namespace KhiLibrary
                 XDocument playlistDatabase = KhiUtils.PlaylistTools.DatabaseElementCreator(playlistPath, playlistName, songsList.ToList());
                 KhiUtils.PlaylistTools.XmlWritingTool(playlistDatabase, playlistPath);
                 KhiUtils.PlaylistTools.PlaylistRecorder(playlistName, playlistPath);
-
             });
         }
 

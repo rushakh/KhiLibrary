@@ -18,8 +18,8 @@ namespace KhiLibrary
         private TimeSpan duration;
         private string genres;
         private string lyrics;
-        private Image? art;
-        private Image? thumbnail;
+        //private Image? art;
+        //private Image? thumbnail;
         // Should later add a method for changing playlist that employs the static addsong and remove song methods
         private int index;
         private static int count;
@@ -173,8 +173,8 @@ namespace KhiLibrary
             duration = TimeSpan.Zero;
             genres = string.Empty;
             lyrics = string.Empty;
-            art = null;
-            thumbnail = null;
+            //art = null;
+            //thumbnail = null;
             Indexer();
         }
 
@@ -184,8 +184,9 @@ namespace KhiLibrary
         /// <param name="audioFilePath"></param>
         public Song(string audioFilePath)
         {
-            string[] songInfo;
-            (songInfo, duration) = KhiUtils.SongInfoTools.GetInfo(audioFilePath).Result;
+            //string[] songInfo;
+            //ReadOnlyCollection<string> songInfo;
+            (var songInfo, duration) = KhiUtils.SongInfoTools.GetInfo(audioFilePath);
             title = songInfo[0];
             artist = songInfo[1];
             album = songInfo[2];
@@ -195,7 +196,7 @@ namespace KhiLibrary
             // duration already got the value
             genres = songInfo[6];
             lyrics = songInfo[7];
-            Indexer();
+            //Indexer();
         }
 
         /// <summary>
@@ -390,17 +391,18 @@ namespace KhiLibrary
             {
                 using (TagLib.File lyrictag = TagLib.File.Create(path, TagLib.ReadStyle.None))
                 {
-                    tempLyrics = lyrictag.Tag.Lyrics;
+                    tempLyrics = lyrictag.Tag.Lyrics;                   
                     if (tempLyrics != null && tempLyrics != string.Empty)
-                    { tempLyrics = tempLyrics.ReplaceLineEndings(); }
-                    else { tempLyrics = string.Empty; }
-                    return tempLyrics;
+                    { 
+                        String copiedLyrics = new string(tempLyrics.ReplaceLineEndings());
+                        return copiedLyrics;
+                    }
+                    else { return string.Empty; }
                 }
             }
             catch
             {
-                tempLyrics = string.Empty;
-                return tempLyrics;
+                return string.Empty;
             }
         }
 
@@ -412,18 +414,14 @@ namespace KhiLibrary
         /// <returns></returns>
         private string SetLyrics(string newLyrics)
         {
-            string tempLyrics;
             try
             {
                 using (TagLib.File lyrictag = TagLib.File.Create(path, TagLib.ReadStyle.None))
                 {
                     lyrictag.Tag.Lyrics = newLyrics;
                     lyrictag.Save();
-                    tempLyrics = lyrictag.Tag.Lyrics;
-                    if (tempLyrics != null && tempLyrics != string.Empty)
-                    { tempLyrics = tempLyrics.ReplaceLineEndings(); }
-                    else { tempLyrics = string.Empty; }
-                    return tempLyrics;
+                    lyrictag.Dispose();
+                    return newLyrics;
                 }
             }
             catch
@@ -439,24 +437,20 @@ namespace KhiLibrary
         /// <returns></returns>
         private string SetTitle(string newTitle)
         {
-            string tempTitle;
+            string titleBackup = title;
             try
             {
                 using (TagLib.File titleTag = TagLib.File.Create(path, TagLib.ReadStyle.None))
                 {
                     titleTag.Tag.Title = newTitle;
                     titleTag.Save();
-                    tempTitle = titleTag.Tag.Title;
-                    if (tempTitle == null || tempTitle != string.Empty)
-                    {
-                        tempTitle = string.Empty;
-                    }
-                    return tempTitle;
+                    titleTag.Dispose();
+                    return newTitle;
                 }
             }
             catch
             {
-                return string.Empty;
+                return titleBackup;
             }
         }
 
@@ -477,10 +471,11 @@ namespace KhiLibrary
         /// </summary>
         /// <param name="newArtists"></param>
         /// <returns></returns>
-        public string SetArtist(string[] newArtists)
+        private string SetArtist(string[] newArtists)
         {
+            string artistsBackup = artist;
             if (newArtists != null && newArtists.Length > 0)
-            {
+            {               
                 string tempConcatedArtists;
                 try
                 {
@@ -488,17 +483,44 @@ namespace KhiLibrary
                     {
                         artistsTag.Tag.Performers = newArtists;
                         artistsTag.Save();
-                        tempConcatedArtists = KhiUtils.SongInfoTools.GetArtist(artistsTag).Result;
-                        return tempConcatedArtists;
+                        //tempConcatedArtists = KhiUtils.SongInfoTools.GetArtist(artistsTag).Result;
+                        //return tempConcatedArtists;
+
+                        if (newArtists.Length == 0) { tempConcatedArtists = string.Empty; }
+                        // If only one artist is mentioned, returns that
+                        else if (newArtists.Length == 1)
+                        {
+                            tempConcatedArtists = (string)artistsTag.Tag.FirstPerformer.Clone();
+                        }
+                        // If several artists are mentioned, concats them all with a space in between
+                        else
+                        {
+                            // Just to initilize the string, since it's easier this way
+                            tempConcatedArtists = string.Empty;
+                            foreach (var oneArtist in newArtists)
+                            {
+                                if (tempConcatedArtists != string.Empty)
+                                {
+                                    tempConcatedArtists += " " + (string)oneArtist.Clone();
+                                }
+                                else
+                                {
+                                    tempConcatedArtists = (string)oneArtist.Clone();
+                                }
+                            }
+                        }
+                        String copiedArtists = new string (tempConcatedArtists);
+                        artistsTag.Dispose();
+                        return copiedArtists;
                     }
                 }
                 catch
                 {
-                    return string.Empty;
+                    return artistsBackup;
                 }
             }
             else
-            { return string.Empty; }
+            { return artistsBackup; }
         }
 
         /// <summary>
@@ -508,24 +530,20 @@ namespace KhiLibrary
         /// <returns></returns>
         private string SetAlbum(string newAlbum)
         {
-            string tempAlbum;
+            string albumBackup = album;
             try
             {
                 using (TagLib.File albumTag = TagLib.File.Create(path, TagLib.ReadStyle.None))
                 {
                     albumTag.Tag.Title = newAlbum;
-                    albumTag.Save();
-                    tempAlbum = albumTag.Tag.Title;
-                    if (tempAlbum == null || tempAlbum != string.Empty)
-                    {
-                        tempAlbum = string.Empty;
-                    }
-                    return tempAlbum;
+                    albumTag.Save(); 
+                    albumTag.Dispose();
+                    return newAlbum;
                 }
             }
             catch
             {
-                return string.Empty;
+                return albumBackup;
             }
         }
 
@@ -557,8 +575,33 @@ namespace KhiLibrary
                     {
                         genresTag.Tag.Genres = newGenres;
                         genresTag.Save();
-                        tempConcatedGenres = KhiUtils.SongInfoTools.GetGenres(genresTag).Result;
-                        return tempConcatedGenres;
+
+                        if (newGenres.Length == 0) { tempConcatedGenres = string.Empty; }
+                        // If only one artist is mentioned, returns that
+                        else if (newGenres.Length == 1)
+                        {
+                            tempConcatedGenres = (string)genresTag.Tag.FirstPerformer.Clone();
+                        }
+                        // If several artists are mentioned, concats them all with a space in between
+                        else
+                        {
+                            // Just to initilize the string, since it's easier this way
+                            tempConcatedGenres = string.Empty;
+                            foreach (var oneArtist in newGenres)
+                            {
+                                if (tempConcatedGenres != string.Empty)
+                                {
+                                    tempConcatedGenres += " " + (string)oneArtist.Clone();
+                                }
+                                else
+                                {
+                                    tempConcatedGenres = (string)oneArtist.Clone();
+                                }
+                            }
+                        }
+                        String copiedGenres = new string(tempConcatedGenres);
+                        genresTag.Dispose();
+                        return copiedGenres;
                     }
                 }
                 catch

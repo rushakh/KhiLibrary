@@ -74,7 +74,7 @@ namespace KhiLibrary
         public DateTime LastUpdated { get => songsList.LastUpdated; }
 
         /// <summary>
-        /// The Songs in the playlist.
+        /// The collection of Songs in the playlist.
         /// </summary>
         public Songs Songs { get => songsList; }
         #endregion 
@@ -216,11 +216,13 @@ namespace KhiLibrary
         {
             await Task.Run(() =>
             {
-                List<Song> tempSongs = KhiUtils.DataFilteringTools.FilterDuplicates(songsList.ToList(), playlistPath);
-                if (tempSongs.Count > 0)
-                {
-                    KhiUtils.PlaylistTools.PlaylistWriter(playlistPath, playlistName, tempSongs);
-                }
+                var currentSongs = songsList.ToList();
+                //List<Song> tempSongs = KhiUtils.DataFilteringTools.FilterDuplicates(songsList.ToList(), playlistPath);
+                //if (tempSongs.Count > 0)
+                //{
+                    System.IO.File.Delete(playlistPath);                
+                    KhiUtils.PlaylistTools.PlaylistWriter(playlistPath, playlistName, currentSongs);
+                //}
             });
         }
         #endregion

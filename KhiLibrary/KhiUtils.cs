@@ -1,10 +1,14 @@
 ﻿using Microsoft.WindowsAPICodePack.Shell;
+using System.Collections.ObjectModel;
 using System.Drawing;
+using System.Linq.Expressions;
 using System.Text;
 using System.Windows.Forms;
 using System.Xml;
 using System.Xml.Linq;
+using System.Xml.XPath;
 using TagLib;
+using TagLib.Matroska;
 
 namespace KhiLibrary
 {
@@ -239,7 +243,6 @@ namespace KhiLibrary
 
                         playlistSongs.Add(Song);
                     }
-
                 }
                 return playlistDatabase;
             }
@@ -249,33 +252,38 @@ namespace KhiLibrary
             /// </summary>
             /// <param name="playlistDatabase"></param>
             /// <param name="playlistPath"></param>
-            internal static async void XmlWritingTool(XDocument playlistDatabase, string playlistPath)
+            internal static bool XmlWritingTool(XDocument playlistDatabase, string playlistPath)
             {
-                await Task.Run(() =>
+                bool isFinished = false;
+                FileStreamOptions options = new()
                 {
-                    FileStreamOptions options = new()
-                    {
-                        Options = FileOptions.None,
-                        Access = FileAccess.ReadWrite,
-                        Share = FileShare.ReadWrite,
-                        Mode = FileMode.OpenOrCreate,
-                        BufferSize = 4096
-                    };
-                    XmlWriterSettings settings = new()
-                    {
-                        ConformanceLevel = ConformanceLevel.Auto,
-                        Encoding = Encoding.UTF8,
-                        Indent = true,
-                        NewLineChars = System.Environment.NewLine
-                    };
-
-                    using (StreamWriter datastream = new(playlistPath, Encoding.UTF8, options))
-                    {
-                        XmlWriter dataBaseWriter = XmlWriter.Create(datastream, settings);
-                        playlistDatabase.Save(dataBaseWriter);
-                        dataBaseWriter.Dispose();
-                    }
-                });
+                    Options = FileOptions.None,
+                    Access = FileAccess.ReadWrite,
+                    Share = FileShare.ReadWrite,
+                    Mode = FileMode.OpenOrCreate,
+                    BufferSize = 4096                    
+                };
+                XmlWriterSettings settings = new()
+                {
+                    ConformanceLevel = ConformanceLevel.Auto,
+                    CloseOutput = true,
+                    Encoding = Encoding.UTF8,
+                    Indent = true,
+                    NewLineChars = System.Environment.NewLine,
+                    NewLineHandling = NewLineHandling.None,
+                    WriteEndDocumentOnClose = true,
+                    
+                };
+                using (StreamWriter datastream = new(playlistPath, Encoding.UTF8, options))
+                {
+                    XmlWriter dataBaseWriter = XmlWriter.Create(datastream, settings);
+                    playlistDatabase.Save(dataBaseWriter);
+                    dataBaseWriter.Close();
+                    dataBaseWriter.Dispose();
+                    datastream.Dispose();
+                    isFinished = true;
+                }
+                return isFinished;
             }
 
             /// <summary>
@@ -346,13 +354,11 @@ namespace KhiLibrary
             /// <param name="playlistPath"></param>
             /// <param name="nameOfPlaylist"></param>
             /// <param name="songsInPlaylist"></param>
-            public async static void PlaylistWriter(string playlistPath, string nameOfPlaylist, List<Song> songsInPlaylist)
+            public static bool PlaylistWriter(string playlistPath, string nameOfPlaylist, List<Song> songsInPlaylist)
             {
-                await Task.Run(() =>
-                {
-                    XDocument playlistDatabase = KhiUtils.PlaylistTools.DatabaseElementCreator(playlistPath, nameOfPlaylist, songsInPlaylist);
-                    KhiUtils.PlaylistTools.XmlWritingTool(playlistDatabase, playlistPath);
-                });
+                XDocument playlistDatabase = KhiUtils.PlaylistTools.DatabaseElementCreator(playlistPath, nameOfPlaylist, songsInPlaylist);
+                bool PlaylistSaved = KhiUtils.PlaylistTools.XmlWritingTool(playlistDatabase, playlistPath);
+                return PlaylistSaved;
             }
 
             /// <summary>
@@ -400,7 +406,7 @@ namespace KhiLibrary
                         // All the elements have been read, and Song objects have been turned into a list.
                         return songsInPlaylist;
                     }
-                    else { songsInPlaylist = null; }
+                    else { }//songsInPlaylist = null; }
                 }
                 return songsInPlaylist;
             }
@@ -487,15 +493,20 @@ namespace KhiLibrary
             /// <summary>
             /// Checks if the chosen audio file that is to be processed is of an acceptable extension or not.
             /// </summary>
+            /// <param name="audioFilePath"></param>
             /// <returns></returns>
             public static bool IsAcceptableFormat(string audioFilePath)
             {
-                bool isAcceptable = false;
-                var temp = System.IO.Path.GetExtension(audioFilePath).Trim().ToLower();
-                if (temp == ".mp3" || temp == ".wav" || temp == ".flac" || temp == ".aiff" || temp == ".wma" || 
-                    temp == ".pcm" || temp == ".aac" || temp == ".oog" || temp == ".alac" || temp == ".m4a")
-                { isAcceptable = true; }
-                return isAcceptable;
+                try
+                {
+                    bool isAcceptable = false;
+                    var temp = System.IO.Path.GetExtension(audioFilePath).Trim().ToLower();
+                    if (temp == ".mp3" || temp == ".wav" || temp == ".flac" || temp == ".aiff" || temp == ".wma" ||
+                        temp == ".pcm" || temp == ".aac" || temp == ".oog" || temp == ".alac" || temp == ".m4a")
+                    { isAcceptable = true; }
+                    return isAcceptable;
+                }
+                catch { return false; }
             }
 
             /// <summary>
@@ -549,6 +560,36 @@ namespace KhiLibrary
                 {
                     return newSongs;
                 }
+            }
+
+            /// <summary>
+            /// Checks if the songs at the specified locations already exist in the playlist's database. 
+            /// Returns the paths that are not duplicates as a  <see langword="string"/>[].
+            /// </summary>
+            /// <param name="audioPaths"></param>
+            /// <param name="playlistPath"></param>
+            /// <returns></returns>
+            internal static string[] FilterDuplicates(string[] audioPaths, string playlistPath)
+            {
+                List<string> checkedPaths = new List<string>();
+                XDocument playlistDataBase = XDocument.Load(playlistPath);
+                XElement? playlistSongs = playlistDataBase.Root; //the document root node
+                if (playlistSongs != null && playlistSongs.HasElements)
+                {
+                    int i = 0;
+                    foreach (XElement playlistSong in playlistSongs.Elements())
+                    {
+                        XElement? path = playlistSong.Element("Path");
+                        if (path != null && audioPaths[i] != path.Value)
+                        {
+                            checkedPaths.Add(audioPaths[i]);
+                        }
+                        if (i < audioPaths.Length) { i++; }
+                    }
+                    return checkedPaths.ToArray();
+                }
+                else
+                { return audioPaths; }
             }
 
             /// <summary>
@@ -607,13 +648,14 @@ namespace KhiLibrary
         public class SongInfoTools
         {
             /// <summary>
-            /// Populates this instance with the song's info, comprised of title, artist, album, path, artPath, 
+            /// Async Method that Populates this instance with the song's info, comprised of title, artist, album, path, artPath, 
             /// thumbnailPath, duration and genres. The art, Thumbnail and lyrics will be loaded on demand to 
             /// cut back on unnecessary memory usage.
             /// </summary>
             /// <param name="audioFilePath"></param>
             /// <returns></returns>
-            public static async Task<(string[], TimeSpan)> GetInfo(string audioFilePath)
+            /// <exception cref="FileNotFoundException"></exception>
+            public static async Task<(string[], TimeSpan)> GetInfoAsync(string audioFilePath)
             {
                 string songTitle, songArtist, songAlbum, songPath, songGenres, songLyrics, songArtPath, songThumbnailPath;
                 TimeSpan songDuration;
@@ -639,14 +681,15 @@ namespace KhiLibrary
                             songDuration = time;
                             // For genres
                             songGenres = await GetGenres(musicTags);
-                            // For lyrics
-                            var temp = musicTags.Tag.Lyrics;
-                            if (temp != null) { songLyrics = musicTags.Tag.Lyrics.ReplaceLineEndings(); }
-                            else { songLyrics = string.Empty; }
+                            // *** For lyrics: For now Commented Out --> they should be extracted as needed to cut back on memory usage
+                            // var temp = musicTags.Tag.Lyrics;
+                            //if (temp != null) { songLyrics = musicTags.Tag.Lyrics.ReplaceLineEndings(); }
+                            //else { songLyrics = string.Empty; }
                             // Getting the file name without extention, for the ImageHandler method
                             string fileName = System.IO.Path.GetFileNameWithoutExtension(audioFilePath);
                             // For saving the cover art and the thumbnail, and getting their paths
-                            KhiUtils.SongInfoTools.ImageHandler(musicTags, fileName);
+                            IPicture[] embeddedImages = musicTags.Tag.Pictures;
+                            ImageHandler(embeddedImages, fileName);
                             songArtPath = KhiUtils.albumArtsPath + fileName + ".bmp";
                             songThumbnailPath = KhiUtils.albumArtsThumbnailsPath + fileName + ".bmp";
 
@@ -657,10 +700,11 @@ namespace KhiLibrary
                             songInfo[4] = songArtPath;
                             songInfo[5] = songThumbnailPath;
                             songInfo[6] = songGenres;
-                            songInfo[7] = songLyrics;
+                            songInfo[7] = string.Empty; //songLyrics;
                             musicTags.Dispose();
-                            return (songInfo, songDuration);
+                            //return (songInfo, songDuration);
                         }
+                        return (songInfo, songDuration);
                     }
                     catch
                     {
@@ -676,12 +720,181 @@ namespace KhiLibrary
             }
 
             /// <summary>
+            /// Populates this instance with the song's info, comprised of title, artist, album, path, artPath, 
+            /// thumbnailPath, duration and genres. The art, Thumbnail and lyrics will be loaded on demand to 
+            /// cut back on unnecessary memory usage.
+            /// </summary>
+            /// <param name="audioFilePath"></param>
+            /// <returns></returns>
+            /// <exception cref="FileNotFoundException"></exception>
+            public static (ReadOnlyCollection<string>, TimeSpan) GetInfo(string audioFilePath)
+            {
+                string songTitle, songArtist, songAlbum, songPath, songGenres, songLyrics, songArtPath, songThumbnailPath;
+                TimeSpan songDuration;
+                string[] songInfo = new string[8];
+                ReadOnlyCollection<string> songInfos;
+                if (System.IO.File.Exists(audioFilePath))
+                {
+                    try
+                    {
+                        // Getting errors, should try making them syncronous for now and see if it gets fixed
+                        using (TagLib.File musicTags = TagLib.File.Create(audioFilePath, ReadStyle.Average))
+                        {
+                            //var tempTags = musicTags.Tag;
+                            songPath = audioFilePath;
+                            // Getting the file name without extention, for the ImageHandler method
+                            string fileName = System.IO.Path.GetFileNameWithoutExtension(audioFilePath);
+                            songArtPath = KhiUtils.albumArtsPath + fileName + ".bmp";
+                            songThumbnailPath = KhiUtils.albumArtsThumbnailsPath + fileName + ".bmp";
+                            // For saving the cover art and the thumbnail, and getting their paths
+                            IPicture[] embeddedImages = musicTags.Tag.Pictures;
+                            //ImageHandler(embeddedImages, fileName);
+                            Image albumArt;
+                            bool useDefaultPic = false;
+                            if (embeddedImages != null && embeddedImages.Length > 0)
+                            {
+                                if (embeddedImages[0].Data != null && embeddedImages[0].Data.Data != null)
+                                {
+                                    var tempAlbumArt = new ImageConverter().ConvertFrom(embeddedImages[0].Data.Data);
+                                    if (tempAlbumArt != null)
+                                    {
+                                        albumArt = (Image)tempAlbumArt;
+                                        ImageSaver(albumArt, songArtPath);
+                                        ThumbnailSaver(albumArt, songThumbnailPath);
+                                        albumArt.Dispose();
+                                    }
+                                    else
+                                    { useDefaultPic = true; }
+                                }
+                                else 
+                                    { useDefaultPic = true; }                                
+                            }
+                            else
+                            { useDefaultPic = true; }
+                            if (useDefaultPic)
+                            {
+                                albumArt = KhiLibrary.Resources.kh;
+                                var thumbnail = KhiLibrary.Resources.Khi_Player_Thumbnail;
+                                // Checks if the AlbumArt and thumbnails directories exists, if not creates them.
+                                if (!System.IO.Directory.Exists(KhiUtils.albumArtsPath)) { System.IO.Directory.CreateDirectory(KhiUtils.albumArtsPath); }
+                                if (!System.IO.Directory.Exists(KhiUtils.albumArtsThumbnailsPath)) { System.IO.Directory.CreateDirectory(KhiUtils.albumArtsThumbnailsPath); }
+                                albumArt.Save(albumArtsPath);
+                                thumbnail.Save(albumArtsThumbnailsPath);
+                                thumbnail.Dispose();
+                                albumArt.Dispose();
+                            }
+                            // For title
+                            string tempTitle;
+                            if (musicTags.Tag.Title == null)
+                            {
+                                System.IO.FileInfo sth = new(audioFilePath);
+                                tempTitle = (string)sth.Name.Clone();
+                            }
+                            else
+                            {
+                                tempTitle = (string)musicTags.Tag.Title.Clone();
+                            }
+                            songTitle = tempTitle;
+                            // For artists
+                            var allArtists = musicTags.Tag.Performers;
+                            // If no artist is mentioned, returns an empty string
+                            if (allArtists.Length == 0) { songArtist = string.Empty; }
+                            // If only one artist is mentioned, returns that
+                            else if (allArtists.Length == 1)
+                            {
+                                songArtist = (string)musicTags.Tag.FirstPerformer.Clone();
+                            }
+                            // If several artists are mentioned, concats them all with a space in between
+                            else
+                            {
+                                // Just to initilize the string, since it's easier this way
+                                songArtist = string.Empty;
+                                foreach (var oneArtist in allArtists)
+                                {
+                                    if (songArtist != string.Empty)
+                                    {
+                                        songArtist += " " + (string)oneArtist.Clone();
+                                    }
+                                    else
+                                    {
+                                        songArtist = (string)oneArtist.Clone();
+                                    }
+                                }
+                            }
+                            // For Album, if it is mentioned, returns it, otherwise, an empty string is returned.
+                            if (musicTags.Tag.Album == null) { songAlbum = string.Empty; }
+                            else { songAlbum = (string)musicTags.Tag.Album.Clone(); }
+                            // For duration
+                            var time = musicTags.Properties.Duration.Duration();
+                            songDuration = time;
+                            // For genres
+                            var allGenres = musicTags.Tag.Genres;
+                            // If no Genre is mentioned in the file returns an empty string.
+                            if (allGenres.Length == 0) { songGenres = string.Empty; }
+                            // If only one genre is mentioned, returns that.
+                            else if (allGenres.Length == 1)
+                            {
+                                songGenres = allGenres[0];
+                            }
+                            // If several genres are mentioned, concats them all with a space in between.
+                            else
+                            {
+                                // just to initilize the string, easier this way.
+                                songGenres = string.Empty;
+                                foreach (string oneGenre in allGenres)
+                                {
+                                    // So that the first loop does not perform this
+                                    if (songGenres != string.Empty)
+                                    {
+                                        songGenres += " " + (string)oneGenre.Clone();
+                                    }
+                                    else
+                                    {
+                                        songGenres = (string)oneGenre.Clone();
+                                    }
+                                }
+                            }
+                            // *** For lyrics: For now Commented Out --> they should be extracted as needed to cut back on memory usage
+                            // var temp = musicTags.Tag.Lyrics;
+                            //if (temp != null) { songLyrics = musicTags.Tag.Lyrics.ReplaceLineEndings(); }
+                            //else { songLyrics = string.Empty; }                            
+                            
+
+                            songInfo[0] = songTitle;
+                            songInfo[1] = songArtist;
+                            songInfo[2] = songAlbum;
+                            songInfo[3] = songPath;
+                            songInfo[4] = songArtPath;
+                            songInfo[5] = songThumbnailPath;
+                            songInfo[6] = songGenres;
+                            songInfo[7] = string.Empty; //songLyrics;
+                            songInfos = songInfo.AsReadOnly();
+                            musicTags.Dispose();
+                            return (songInfos, songDuration);
+                        }
+                        //return (songInfo, songDuration);
+                    }
+                    catch
+                    {
+                        (songInfo, songDuration) = GetInfoAlt(audioFilePath);
+                        songInfos = songInfo.AsReadOnly();
+                        return (songInfos, songDuration);
+                    }
+                }
+                // In case the file doesn't exist, the path was not correct etc, throws an exception
+                else
+                {
+                    throw new FileNotFoundException();
+                }
+            }
+
+            /// <summary>
             /// Gets and retuns the audio file's info, using an alternative method (using ShellFile). 
             /// </summary>
             /// <param name="audioFilePath"></param>
             /// <returns></returns>
             /// <exception cref="FileLoadException"></exception>
-            private static (string[], TimeSpan) GetInfoAlt(string audioFilePath)
+            public static (string[], TimeSpan) GetInfoAlt(string audioFilePath)
             {
                 string songTitle, songArtist, songAlbum, songPath, songGenres, songLyrics, songArtPath, songThumbnailPath;
                 TimeSpan songDuration;
@@ -703,18 +916,24 @@ namespace KhiLibrary
                         Image art;
                         var tempArt = songShell.Thumbnail;
                         // For getting the Image and thumbnail
-                        if (tempArt != null)
-                        {
-                            art = (Image)tempArt.Bitmap.Clone();
-                        }
-                        // If the ShellFile is null, uses the default KhiPlayer image nad thumbnail.
-                        else
-                        {
-                            art = Resources.Khi_Player;
-                        }
+                            if (tempArt != null)
+                            {
+                                using (Bitmap tempPic = new Bitmap(tempArt.LargeBitmap))
+                                {
+                                    art = new Bitmap(tempPic);
+                                }
+                                //art = (Image)tempArt.LargeBitmap.Clone();
+                            }
+                            // If the ShellFile is null, uses the default KhiPlayer image nad thumbnail.
+                            else
+                            {
+                                art = Resources.Khi_Player;
+                            }
                         // For saving the images
-                        ImageSaver(art, songArtPath);
-                        ThumbnailSaver(art, songThumbnailPath);
+                        
+                            ImageSaver(art, songArtPath);
+                            ThumbnailSaver(art, songThumbnailPath);
+                            art.Dispose();
                         // For Artist
                         var tempArtist = songShell.Properties.System.Music.Artist.Value;
                         if (tempArtist != null) 
@@ -750,8 +969,8 @@ namespace KhiLibrary
                         if (tempAlbum != null) { songAlbum = tempAlbum; }
                         else { songAlbum = string.Empty; }
                         // For Duration
-                        var tempDur = songShell.Properties.System.Media.Duration.Value;
-                        if (tempDur != null) { songDuration = TimeSpan.FromMilliseconds((double)(tempDur * 0.001)); }
+                        var tempDur = (ulong)songShell.Properties.System.Media.Duration.ValueAsObject;
+                        if (tempDur != null) { songDuration = TimeSpan.FromTicks((long)tempDur); }
                         else { songDuration = TimeSpan.Zero; }
                         // For Genres
                         var tempGenres = songShell.Properties.System.Music.Genre.Value;
@@ -784,10 +1003,10 @@ namespace KhiLibrary
                             }
                         }
                         else { songGenres = string.Empty; }
-                        // For Lyrics
-                        var tempLyrics = songShell.Properties.System.Music.Lyrics.Value;
-                        if (tempLyrics != null) { songLyrics = tempLyrics.ReplaceLineEndings(); }
-                        else { songLyrics = string.Empty; }                        
+                        // *** For lyrics: For now Commented Out --> they should be extracted as needed to cut back on memory usage
+                        //var tempLyrics = songShell.Properties.System.Music.Lyrics.Value;
+                        //if (tempLyrics != null) { songLyrics = tempLyrics.ReplaceLineEndings(); }
+                        //else { songLyrics = string.Empty; }                        
 
                         songInfo[0] = songTitle;
                         songInfo[1] = songArtist;
@@ -796,14 +1015,14 @@ namespace KhiLibrary
                         songInfo[4] = songArtPath;
                         songInfo[5] = songThumbnailPath;
                         songInfo[6] = songGenres;
-                        songInfo[7] = songLyrics;
-
-                        art.Dispose();
+                        songInfo[7] = string.Empty; //songLyrics;
+                      
                         songShell.Dispose();
-                        return (songInfo, songDuration);
+                        //return (songInfo, songDuration);
                     }
                     else
                     { throw new FileLoadException(); }
+                    return (songInfo, songDuration);
                 }
             }
 
@@ -986,43 +1205,49 @@ namespace KhiLibrary
             /// <param name="audioFileNameWithoutExtension"></param>
             public static async void ImageHandler(IPicture[] embeddedImages, string audioFileNameWithoutExtension)
             {
+                // To populate the object's artPath and ThumbnailPath that is used for loading the images
+                string tempArtPath = KhiUtils.albumArtsPath + audioFileNameWithoutExtension + ".bmp";
+                string tempThumbnailPath = KhiUtils.albumArtsThumbnailsPath + audioFileNameWithoutExtension + ".bmp";
                 await Task.Run(() =>
                 {
+                    //MemoryStream picConverter;
+                    bool useDefaultImage = false;
                     // Using local variables because there is no need to have the images in memory. It's better and less memory expensive
                     // to load them when they are needed
-                    Image art;
-                    MemoryStream picConverter = new();
-                    if (embeddedImages.Length > 0)
+                    Image art;                  
+                    if (embeddedImages.Length > 0 && embeddedImages[0].Type != TagLib.PictureType.NotAPicture)
                     {
-                        picConverter = new MemoryStream(embeddedImages[0].Data.Data);
-                        if (picConverter == null || !picConverter.CanRead || !picConverter.CanWrite || embeddedImages[0].Type == TagLib.PictureType.NotAPicture)
+                        using (MemoryStream picConverter = new MemoryStream(embeddedImages[0].Data.Data))
                         {
-                            art = Resources.Khi_Player;
-                        }
-                        else
-                        {
-                            try
+                            if (picConverter != null && picConverter.CanRead)
                             {
                                 var tempArt = Image.FromStream(picConverter);
                                 art = (Image)tempArt.Clone();
+                                ImageSaver(art, tempArtPath);
+                                ThumbnailSaver(art, tempThumbnailPath);
+                                art.Dispose();
+                                tempArt.Dispose();
+                                picConverter.Dispose();
                             }
-                            catch { art = art = Resources.Khi_Player; }
+                            else
+                            {
+                                useDefaultImage = true;
+                            }
                         }
                     }
                     else
                     {
-                        art = Resources.Khi_Player;
-                        //thumbnail = Resources.Khi_Player_Thumbnail;
+                        useDefaultImage = true; 
                     }
-                    // To populate the object's artPath and ThumbnailPath that is used for loading the images
-                    string tempArtPath = KhiUtils.albumArtsPath + audioFileNameWithoutExtension + ".bmp";
-                    string tempThumbnailPath = KhiUtils.albumArtsThumbnailsPath + audioFileNameWithoutExtension + ".bmp";
-                    // For saving cover art
-                    ImageSaver(art, tempArtPath);
-                    ThumbnailSaver(art, tempThumbnailPath);
-
-                    picConverter.Dispose();
-                    art.Dispose();
+                    if (useDefaultImage)
+                    {
+                        art = Resources.Khi_Player;
+                        Image thumbnail = Resources.Khi_Player_Thumbnail;
+                        ImageSaver(art, tempArtPath);
+                        ImageSaver(thumbnail, tempThumbnailPath);
+                        art.Dispose();
+                        thumbnail.Dispose();
+                    }
                 });
             }
 
@@ -1075,6 +1300,7 @@ namespace KhiLibrary
 
             /// <summary>
             /// Saves the Image to the the provided path.
+            /// </summary>
             /// <param name="image"></param>
             /// <param name="imagePath"></param>
             private static void ImageSaver(Image image, string imagePath)
@@ -1084,30 +1310,27 @@ namespace KhiLibrary
                 if (!System.IO.Directory.Exists(KhiUtils.albumArtsThumbnailsPath)) { System.IO.Directory.CreateDirectory(KhiUtils.albumArtsThumbnailsPath); }
 
                 // Saving the Image to the provided location.
-                try
+                using (FileStream artSaver = new(imagePath, FileMode.Create, FileAccess.ReadWrite))
                 {
-                    using (FileStream artSaver = new(imagePath, FileMode.Create, FileAccess.ReadWrite))
+                    try
                     {
                         image.Save(artSaver, image.RawFormat);
                         artSaver.Dispose();
                     }
-                }
-                catch 
-                {
-                    // For when the Encoder Parameter cannot be null exception is thrown (since the image exists in memory, it does not have an encoder)
-                    using (FileStream artSaver = new(imagePath, FileMode.Create, FileAccess.ReadWrite))
+                    catch
                     {
                         image.Save(artSaver, System.Drawing.Imaging.ImageFormat.Bmp);
                         artSaver.Dispose();
                     }
                 }
             }
-            
+
             /// <summary>
             /// Creates a thumbnail of the image (60, 60) and saves it to the provided location.
             /// </summary>
             /// <param name="image"></param>
             /// <param name="thumbnailPath"></param>
+            /// <param name="checkDirectory"></param>
             private static void ThumbnailSaver(Image image, string thumbnailPath, bool checkDirectory = false)
             {
                 // Checks if the AlbumArt and thumbnails directories exists, if not creates them.
@@ -1119,23 +1342,21 @@ namespace KhiLibrary
                 // Creates the Thumbnail
                 Image thumbnail = image.GetThumbnailImage(60, 60, () => false, 0);
                 // Saving the thumbnail to the provided location.
-                try
+                using (FileStream thumbnailSaver = new(thumbnailPath, FileMode.Create, FileAccess.Write))
                 {
-                    using (FileStream thumbnailSaver = new(thumbnailPath, FileMode.Create, FileAccess.Write))
+                    try
                     {
                         thumbnail.Save(thumbnailSaver, image.RawFormat);
                         thumbnailSaver.Dispose();
-                    }                  
-                }
-                catch 
-                {
-                    using (FileStream thumbnailSaver = new(thumbnailPath, FileMode.Create, FileAccess.Write))
+                        thumbnail.Dispose();
+                    }
+                    catch
                     {
                         thumbnail.Save(thumbnailSaver, System.Drawing.Imaging.ImageFormat.Bmp);
                         thumbnailSaver.Dispose();
+                        thumbnail.Dispose();
                     }
                 }
-                thumbnail.Dispose();
             }
         }
 

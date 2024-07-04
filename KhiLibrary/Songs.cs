@@ -136,6 +136,15 @@ namespace KhiLibrary
 
         #region instanceMethods
         /// <summary>
+        /// Returns an Enumerator that iterates through songs in Songs collection.
+        /// </summary>
+        /// <returns></returns>
+        public IEnumerator<Song> GetEnumerator()
+        { 
+            return songs.GetEnumerator();
+        }
+
+        /// <summary>
         /// For adding an already consctructed song
         /// </summary>
         /// <param name="newSong"></param>
@@ -178,36 +187,35 @@ namespace KhiLibrary
         /// Adds several songs to the playlist using their paths.
         /// </summary>
         /// <param name="audioPaths"></param>
-        public async void AddRange(string[] audioPaths)
+        public void AddRange(string[] audioPaths)
         {
-            await Task.Run(() =>
+            var actualAudioPaths = KhiUtils.DataFilteringTools.FilterFilesBasedOnExtention(audioPaths);
+            var checkedAudios = KhiUtils.DataFilteringTools.FilterDuplicates(actualAudioPaths, ownerPlaylistPath);
+            List<Song> tempNewSongs = new List<Song>();
+            if (checkedAudios != null && checkedAudios.Length > 0)
             {
-                List<Song> tempSongs = new List<Song>();
-                foreach (string audioPath in audioPaths)
+                foreach (string audioPath in checkedAudios)
                 {
-                    Song newSong = new(audioPath);
-                    tempSongs.Add(newSong);
+                    tempNewSongs.Add(new Song(audioPath));
                 }
-                List <Song> checkedSongs  = KhiUtils.DataFilteringTools.FilterDuplicates(tempSongs, ownerPlaylistPath);
-                if (checkedSongs.Count > 0)
-                {
-                    foreach (Song song in checkedSongs)
-                    {
-                        songs.Add(song);
-                    }
-                    //songs.AddRange(tempSongs);
-                    songsListLastUpdated = DateTime.Now;
-                    KhiUtils.PlaylistTools.PlaylistWriter(ownerPlaylistPath, ownerPlaylistName, checkedSongs);
-                    calculateTotallPlaytime();                   
-                }
-                // Better to do nothing, since they already exist in the playlist, no need for an Exception to be thrown.
-                else 
-                {
-                    //Exception duplicateOrEmpty = new Exception("Duplicate files / Empty list");
-                    //throw duplicateOrEmpty; 
-                }
-                tempSongs.Clear();
-            });
+                this.AddRange(tempNewSongs.ToArray());
+                tempNewSongs = null;
+            }
+        }
+
+        /// <summary>
+        /// Adds an Array of songs to the playlist
+        /// </summary>
+        /// <param name="newSongs"></param>
+        public void AddRange(Song[] newSongs)
+        {
+            if (newSongs != null)
+            {
+                songs.AddRange(newSongs);
+                KhiUtils.PlaylistTools.PlaylistWriter(ownerPlaylistPath, ownerPlaylistName, songs);
+                songsListLastUpdated = DateTime.Now;
+                calculateTotallPlaytime();
+            }
         }
 
         /// <summary>
@@ -364,7 +372,6 @@ namespace KhiLibrary
             }
             return tempTotal;
         }
-
 
         /// <summary>
         /// Finds playlists, and Removes the specified song from this playlist, and optionally 

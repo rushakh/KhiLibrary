@@ -1,4 +1,6 @@
-﻿namespace KhiLibrary
+﻿using System.Windows.Media;
+
+namespace KhiLibrary
 {
     /// <summary>
     /// An object containing a collection of Playlist objects.
@@ -8,8 +10,14 @@
         //private int count;
         private List<Playlist> playlistsList;
 
+        /// <summary>
+        /// The number of playlists in the collection
+        /// </summary>
         public int Count { get => playlistsList.Count; }
 
+        /// <summary>
+        /// The collection of playlists.
+        /// </summary>
         public List<Playlist> PlaylistsList { get => playlistsList; }
 
         /// <summary>
@@ -26,6 +34,14 @@
 
         #region instanceMethods
         /// <summary>
+        /// Returns an Enumerator that iterates through playlists in this Playlists collection.
+        /// </summary>
+        /// <returns></returns>
+        public IEnumerator<Playlist> GetEnumerator()
+        {
+            return playlistsList.GetEnumerator();
+        }
+        /// <summary>
         /// Indexer -Returns the playlist with the provided index. If requested index is bigger than the number of 
         /// playlists or if no playlist has been added yet, returns null.
         /// </summary>
@@ -33,7 +49,7 @@
         /// <returns></returns>
         /// <exception cref="InvalidOperationException"></exception>
         /// <exception cref="ArgumentException"></exception>
-        public Playlist this[int index]
+        public Playlist? this[int index]
         {
             get
             {
@@ -74,26 +90,69 @@
         }
 
         /// <summary>
+        /// Indexer -Returns the playlist with the provided string as Name. If requested Playlist does not exist 
+        /// returns null.
+        /// </summary>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentOutOfRangeException"></exception>
+        public Playlist? this[string name]
+        {           
+            get 
+            {
+                var tempFoundPlaylist = FindPlaylist(name);
+                if (tempFoundPlaylist != null)
+                { return tempFoundPlaylist; }
+                else
+                { return null;}
+            }
+            set
+            {
+                var index = playlistsList.FindIndex(s => s.Name == name);
+                if (index != -1)
+                {
+                    var foundPlaylist = FindPlaylist(name);
+                    if (foundPlaylist != null)
+                    {
+                        playlistsList[index] = foundPlaylist;
+                    }
+                }
+                else
+                {
+                    throw new ArgumentOutOfRangeException("A playlist with the specified name does not exist.");
+                }
+            }
+        }
+
+        /// <summary>
+        /// If there exists previously made and saved playlists, will asynchronously load them into this instance
+        /// </summary>
+        public void LoadExistingDatabases()
+        {
+            playlistsList.Clear();
+            var existingPlaylists = KhiUtils.PlaylistTools.ReadPlaylistsRecords();
+            if (existingPlaylists != null && existingPlaylists.Count > 0)
+            {
+                foreach (var pList in existingPlaylists)
+                {
+                    var tempSongs = KhiUtils.PlaylistTools.PlaylistReader(pList.Key, pList.Value);
+                    if (tempSongs != null)
+                    {
+                        Songs newSongs = new Songs(tempSongs, pList.Key, pList.Value);
+                        playlistsList.Add(new Playlist(newSongs, pList.Key, pList.Value));
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// If there exists previously made and saved playlists, will load them into this instance
         /// </summary>
-        public async void LoadExistingDatabases()
+        public async void LoadExistingDatabasesAsync()
         {
             await Task.Run(() =>
             {
-                var existingPlaylists = KhiUtils.PlaylistTools.ReadPlaylistsRecords();
-                if (existingPlaylists != null && existingPlaylists.Count > 0)
-                {
-                    foreach (var pList in existingPlaylists)
-                    {
-                        var tempSongs = KhiUtils.PlaylistTools.PlaylistReader (pList.Key, pList.Value);
-                        if (tempSongs != null)
-                        {
-                            Songs newSongs = new Songs(tempSongs, pList.Key, pList.Value);
-                            Playlist newPlaylist = new Playlist(newSongs, pList.Key, pList.Value);
-                            AddPlaylist(newPlaylist);
-                        }
-                    }
-                }
+                LoadExistingDatabases();
             });
         }
 
@@ -105,13 +164,7 @@
         {
             if (KhiUtils.PlaylistTools.IsAcceptablePlaylistName(playlistName))
             {
-                Playlist newPlaylist = new(playlistName);
-                if (playlistsList != null) { playlistsList.Add(newPlaylist); }
-                else
-                { 
-                    playlistsList = new List<Playlist>();
-                    playlistsList.Add(newPlaylist);
-                }              
+                playlistsList.Add(new Playlist(playlistName));                       
             }
             else
             { throw new Exception("Invalid Playlist Name"); }
@@ -132,7 +185,7 @@
         /// <param name="newPlaylistList"></param>
         public void AddRange(List<Playlist> newPlaylistList)
         {
-            if (newPlaylistList != null & newPlaylistList.Count > 0)
+            if (newPlaylistList != null && newPlaylistList.Count > 0)
             {
                 foreach (Playlist playlist in newPlaylistList)
                 {

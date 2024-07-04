@@ -773,13 +773,13 @@ namespace KhiLibrary
                             { useDefaultPic = true; }
                             if (useDefaultPic)
                             {
-                                albumArt = KhiLibrary.Resources.kh;
+                                albumArt = KhiLibrary.Resources.Khi_Player;
                                 var thumbnail = KhiLibrary.Resources.Khi_Player_Thumbnail;
                                 // Checks if the AlbumArt and thumbnails directories exists, if not creates them.
                                 if (!System.IO.Directory.Exists(KhiUtils.albumArtsPath)) { System.IO.Directory.CreateDirectory(KhiUtils.albumArtsPath); }
                                 if (!System.IO.Directory.Exists(KhiUtils.albumArtsThumbnailsPath)) { System.IO.Directory.CreateDirectory(KhiUtils.albumArtsThumbnailsPath); }
-                                albumArt.Save(albumArtsPath);
-                                thumbnail.Save(albumArtsThumbnailsPath);
+                                albumArt.Save(songArtPath);
+                                thumbnail.Save(songThumbnailPath);
                                 thumbnail.Dispose();
                                 albumArt.Dispose();
                             }
@@ -916,24 +916,23 @@ namespace KhiLibrary
                         Image art;
                         var tempArt = songShell.Thumbnail;
                         // For getting the Image and thumbnail
-                            if (tempArt != null)
+                        if (tempArt != null)
+                        {
+                            using (Image tempPic = tempArt.ExtraLargeBitmap)
                             {
-                                using (Bitmap tempPic = new Bitmap(tempArt.LargeBitmap))
-                                {
-                                    art = new Bitmap(tempPic);
-                                }
-                                //art = (Image)tempArt.LargeBitmap.Clone();
+                                art = new Bitmap(tempPic);
                             }
-                            // If the ShellFile is null, uses the default KhiPlayer image nad thumbnail.
-                            else
-                            {
-                                art = Resources.Khi_Player;
-                            }
-                        // For saving the images
-                        
-                            ImageSaver(art, songArtPath);
-                            ThumbnailSaver(art, songThumbnailPath);
-                            art.Dispose();
+                            //art = (Image)tempArt.LargeBitmap.Clone();
+                        }
+                        // If the ShellFile is null, uses the default KhiPlayer image nad thumbnail.
+                        else
+                        {
+                            art = Resources.Khi_Player;
+                        }
+                        // For saving the images                      
+                        ImageSaver(art, songArtPath);
+                        ThumbnailSaver(art, songThumbnailPath);
+                        art.Dispose();
                         // For Artist
                         var tempArtist = songShell.Properties.System.Music.Artist.Value;
                         if (tempArtist != null) 

@@ -21,7 +21,6 @@
 
   <ItemGroup>
     <None Remove="Resources\Khi Player Thumbnail.bmp" />
-    <None Remove="Resources\Khi Player.png" />
     <None Remove="Resources\Khi-Player-Icon.ico" />
     <None Remove="Resources\Khi_Player.png" />
     <None Remove="Resources\Loop Dark Mode.png" />
@@ -43,7 +42,6 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\Khi Player Thumbnail.bmp" />
-    <EmbeddedResource Include="Resources\Khi Player.png" />
     <EmbeddedResource Include="Resources\Khi-Player-Icon.ico" />
     <EmbeddedResource Include="Resources\Khi_Player.png" />
     <EmbeddedResource Include="Resources\Loop Dark Mode.png" />

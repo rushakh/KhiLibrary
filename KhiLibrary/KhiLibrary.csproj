@@ -63,8 +63,7 @@
 
   <ItemGroup>
     <PackageReference Include="NAudio" Version="2.2.1" />
-    <PackageReference Include="TagLibSharp" Version="2.3.0" />
-    <PackageReference Include="WindowsAPICodePackShell" Version="8.0.2" />
+    <PackageReference Include="z440.atl.core" Version="5.25.0" />
   </ItemGroup>
 
   <ItemGroup>

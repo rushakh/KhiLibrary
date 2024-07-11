@@ -1,5 +1,4 @@
 ﻿using System.Windows.Forms;
-using System.Xml;
 
 namespace KhiLibrary
 {
@@ -71,7 +70,7 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Creates a Songs object using an already connstructed list of songs (List<Song>), in addition 
+        /// Creates a Songs object using an already connstructed list of songs(List of type Song), in addition 
         /// to the playlist's name and path. This is mainly used for loading an already existing playlist 
         /// from the database.
         /// </summary>
@@ -81,15 +80,15 @@ namespace KhiLibrary
         public Songs(List<Song> songsList, string playlistName, string playlistPath)
         {
             songs = songsList;
-            ownerPlaylistName= playlistName;
-            ownerPlaylistPath= playlistPath;
+            ownerPlaylistName = playlistName;
+            ownerPlaylistPath = playlistPath;
             songsListLastUpdated = DateTime.Now;
             songsListTotalPlaytime = calculateTotallPlaytime();
         }
         #endregion
 
         /// <summary>
-        /// Indexer -Returns the song with the provided index. If requested index is bigger than the number of 
+        /// Returns the song with the provided index. If requested index is bigger than the number of 
         /// songs or if no song has been added yet, returns null.
         /// </summary>
         /// <param name="index"></param>
@@ -98,20 +97,13 @@ namespace KhiLibrary
         {
             get
             {
-                try
+                if (songs != null && songs.Count >= index)
                 {
-                    if (songs != null && songs.Count >= index)
-                    {
-                        return songs[index];
-                    }
-                    else
-                    {
-                        return null;
-                    }
+                    return songs[index];
                 }
-                catch
+                else
                 {
-                    return null;
+                    throw new ArgumentNullException();
                 }
             }
             set
@@ -140,7 +132,7 @@ namespace KhiLibrary
         /// </summary>
         /// <returns></returns>
         public IEnumerator<Song> GetEnumerator()
-        { 
+        {
             return songs.GetEnumerator();
         }
 
@@ -148,39 +140,42 @@ namespace KhiLibrary
         /// For adding an already consctructed song
         /// </summary>
         /// <param name="newSong"></param>
-        public async void AddSong(Song newSong)
+        public void AddSong(Song newSong)
         {
-            await Task.Run(() =>
+            bool isDuplicate = DataFilteringTools.CheckForDuplicate(newSong, ownerPlaylistPath);
+            if (!isDuplicate)
             {
-                bool isDuplicate = KhiUtils.DataFilteringTools.FilterDuplicates(newSong, ownerPlaylistPath);
-                if (!isDuplicate)
-                {
-                    songs.Add(newSong);
-                    songsListLastUpdated = DateTime.Now;
-                    KhiUtils.PlaylistTools.SongWriter(ownerPlaylistPath, ownerPlaylistName, newSong);
-                    calculateTotallPlaytime();
-                }
-            });
+                songs.Add(newSong);
+                songsListLastUpdated = DateTime.Now;
+                //PlaylistTools.SongWriter(ownerPlaylistPath, ownerPlaylistName, newSong);
+                calculateTotallPlaytime();
+            }
         }
 
         /// <summary>
         /// Adds a song to the playlist using its path.
         /// </summary>
         /// <param name="audioPath"></param>
-        public async void AddSong(string audioPath)
+        public void AddSong(string audioPath)
         {
-            await Task.Run(() =>
+            Song newSong = new(audioPath);
+            if (InternalSettings.doNotAddDuplicateSongs)
             {
-                Song newSong = new(audioPath);
-                bool isDuplicate = KhiUtils.DataFilteringTools.FilterDuplicates(newSong, ownerPlaylistPath);
+                bool isDuplicate = DataFilteringTools.CheckForDuplicate(newSong, ownerPlaylistPath);
                 if (!isDuplicate)
                 {
-                    KhiUtils.PlaylistTools.SongWriter(ownerPlaylistPath, ownerPlaylistName, newSong);
+                    //PlaylistTools.SongWriter(ownerPlaylistPath, ownerPlaylistName, newSong);
                     songs.Add(newSong);
                     songsListLastUpdated = DateTime.Now;
                     calculateTotallPlaytime();
                 }
-            });
+            }
+            else
+            {
+                songs.Add(newSong);
+                songsListLastUpdated = DateTime.Now;
+                calculateTotallPlaytime();
+            }
         }
 
         /// <summary>
@@ -189,17 +184,43 @@ namespace KhiLibrary
         /// <param name="audioPaths"></param>
         public void AddRange(string[] audioPaths)
         {
-            var actualAudioPaths = KhiUtils.DataFilteringTools.FilterFilesBasedOnExtention(audioPaths);
-            var checkedAudios = KhiUtils.DataFilteringTools.FilterDuplicates(actualAudioPaths, ownerPlaylistPath);
-            List<Song> tempNewSongs = new List<Song>();
+            var actualAudioPaths = DataFilteringTools.FilterFilesBasedOnExtention(audioPaths);
+            string[] checkedAudios;
+            if (InternalSettings.doNotAddDuplicateSongs)
+            {
+                checkedAudios = DataFilteringTools.FilterDuplicates(actualAudioPaths, ownerPlaylistPath);
+            }
+            else
+            {
+                checkedAudios = actualAudioPaths;
+            }
             if (checkedAudios != null && checkedAudios.Length > 0)
             {
-                foreach (string audioPath in checkedAudios)
+                List<Song> tempSongsList = [];
+                /*
+                for (int i =0; i<checkedAudios.Length; i++)
                 {
-                    tempNewSongs.Add(new Song(audioPath));
+                    string audioPath = audioPaths[i];
+                    Song newSong = new Song(audioPath);
+                    tempSongsList.Add(newSong);
                 }
-                this.AddRange(tempNewSongs.ToArray());
-                tempNewSongs = null;
+                */
+                Parallel.ForEach(checkedAudios, audioPath =>
+                {
+                    Song newSong = new(audioPath);
+                    tempSongsList.Add(newSong);
+                });
+                songs.AddRange(tempSongsList.ToArray());
+                songs.TrimExcess();
+                tempSongsList.Clear();
+                tempSongsList = new List<Song>(1);
+                checkedAudios = null;
+                actualAudioPaths = null;
+                calculateTotallPlaytime();
+
+                GC.WaitForPendingFinalizers();
+                int gen = GC.MaxGeneration;
+                GC.Collect(gen, GCCollectionMode.Aggressive);
             }
         }
 
@@ -209,12 +230,25 @@ namespace KhiLibrary
         /// <param name="newSongs"></param>
         public void AddRange(Song[] newSongs)
         {
-            if (newSongs != null)
+            if (newSongs != null && newSongs.Length > 0)
             {
-                songs.AddRange(newSongs);
-                KhiUtils.PlaylistTools.PlaylistWriter(ownerPlaylistPath, ownerPlaylistName, songs);
-                songsListLastUpdated = DateTime.Now;
-                calculateTotallPlaytime();
+                if (InternalSettings.doNotAddDuplicateSongs)
+                {
+                    Song[] checkedNewSongs = DataFilteringTools.FilterDuplicates(newSongs, ownerPlaylistPath);
+                    if (checkedNewSongs.Length > 0)
+                    {
+                        songs.AddRange(checkedNewSongs);
+                        songsListLastUpdated = DateTime.Now;
+                        calculateTotallPlaytime();
+                    }
+                }
+                else
+                {
+                    songs.AddRange(newSongs);
+                    songsListLastUpdated = DateTime.Now;
+                    calculateTotallPlaytime();
+                }
+                
             }
         }
 
@@ -235,7 +269,7 @@ namespace KhiLibrary
         /// <param name="artist"></param>
         /// <param name="album"></param>
         /// <returns></returns>
-        public Song Find(string title, string artist = "", string album = "")
+        public Song? Find(string title, string artist = "", string album = "")
         {
             Song foundSong;
             List<Song> tempSongs = [];
@@ -243,23 +277,21 @@ namespace KhiLibrary
             {
                 foreach (Song song in songs)
                 {
-                    if (song.Title != null && artist != "" && song.Artist.ToLower() == artist.ToLower() &&
-                        album != "" && song.Album.ToLower() == album.ToLower() && song.Title.ToLower() == title.ToLower())
+                    if (DataFilteringTools.AreTheSame(song.Title, title, true) && DataFilteringTools.AreTheSame(song.Artist, artist, true) &&
+                        DataFilteringTools.AreTheSame(song.Album, album, true))
                     {
                         foundSong = song;
                         return foundSong;
                     }
-                    else if (song.Title != null && artist != "" && song.Artist.ToLower() == artist.ToLower() &&
-                        song.Title.ToLower() == title.ToLower())
+                    else if (DataFilteringTools.AreTheSame(song.Title, title, true) && DataFilteringTools.AreTheSame(song.Artist, artist))
                     {
                         tempSongs.Add(song);
                     }
-                    else if (song.Title != null && album != "" && song.Album.ToLower() == album.ToLower() &&
-                        song.Title.ToLower() == title.ToLower())
+                    else if (DataFilteringTools.AreTheSame(song.Title, title, true) && DataFilteringTools.AreTheSame(song.Album, album))
                     {
                         tempSongs.Add(song);
                     }
-                    else if (song.Title != null && song.Title.ToLower() == title.ToLower())
+                    else if (DataFilteringTools.AreTheSame(song.Title, title, true))
                     {
                         tempSongs.Add(song);
                     }
@@ -277,25 +309,36 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Removes a song from the playlist.
+        /// Removes a song from the playlist, optionally removing it from all playlists.
         /// </summary>
         /// <param name="toBeRemovedSong"></param>
-        public async void RemoveSong(Song toBeRemovedSong, bool fromAllPlaylists = false)
+        /// <param name="fromAllPlaylists"></param>
+        public void RemoveSong(Song toBeRemovedSong, bool fromAllPlaylists = false)
         {
-            await Task.Run(() =>
-            {
                 // Removes the song object itself from the list.
                 songs.Remove(toBeRemovedSong);
                 // To remove the song info and pics from the database and the folders.
-                SongRemovalHandler(toBeRemovedSong, fromAllPlaylists);
+                PlaylistTools.SongRemovalHandler(toBeRemovedSong, ownerPlaylistName, fromAllPlaylists);
                 songsListLastUpdated = DateTime.Now;
                 calculateTotallPlaytime();
-            });
+        }
+
+        /// <summary>
+        /// Removes a song from the playlist using its index, optionally removing it from all playlists.
+        /// </summary>
+        /// <param name="index"></param>
+        /// <param name="fromAllPlaylists"></param>
+        public void RemoveAt(int index, bool fromAllPlaylists = false)
+        {
+            Song toBeRemovedSong = songs[index];
+            PlaylistTools.SongRemovalHandler(toBeRemovedSong, ownerPlaylistName, fromAllPlaylists);
+            songsListLastUpdated = DateTime.Now;
+            songs.RemoveAt(index);
         }
 
         /// <summary>
         /// Sorts the songs inside the collection based on their Title (0), Artist (1), Album (2), 
-        /// Duration(seconds)(3), and Genre(4).
+        /// Duration(3), Genre(4), TrackNumber (5).
         /// </summary>
         /// <returns></returns>
         public Songs Sort(int columnNumber)
@@ -322,6 +365,9 @@ namespace KhiLibrary
                 case 4:
                     songs.Sort((x, y) => x.Genres.CompareTo(y.Genres));
                     break;
+                case 5:
+                    songs.Sort((x, y) => x.TrackNumber.CompareTo(y.TrackNumber));
+                    break;
 
                 default:
                     songs.Sort((x, y) => x.Title.CompareTo(y.Title));
@@ -331,18 +377,31 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Casts the songs collection into an array of type Song.
+        /// Casts the songs collection into an array of type Song, optionally returning a new array without reference to the original.
         /// </summary>
         /// <returns></returns>
-        public Song[] ToArray()
+        public Song[] ToArray(bool clone = false)
         {
-            Song[] tempSongsArray = new Song[songs.Count];
-            int i = 0;
-            foreach (Song music in songs)
+            if (clone)
             {
-                tempSongsArray[i] = music;
+                Song[] tempSongsArray = songs.ToArray();
+                return tempSongsArray;
             }
-            return tempSongsArray;
+            else
+            {
+                if (songs.Count > 0)
+                {
+                    Song[] songsArray = new Song[songs.Count];
+                    int i = 0;
+                    foreach (Song song in songs)
+                    {
+                        songsArray[i] = song;
+                        i++;
+                    }
+                    return songsArray;
+                }
+                else { return Array.Empty<Song>(); }
+            }
         }
 
         /// <summary>
@@ -373,40 +432,7 @@ namespace KhiLibrary
             return tempTotal;
         }
 
-        /// <summary>
-        /// Finds playlists, and Removes the specified song from this playlist, and optionally 
-        /// from all playlists. 
-        /// </summary>
-        /// <param name="toBeRemovedSong"></param>
-        /// <param name="fromAllPlaylists"></param>
-        private void SongRemovalHandler(Song toBeRemovedSong, bool fromAllPlaylists = false)
-        {
-            XmlElement AllSongs;  //the document root node
-            XmlDocument musicDatabase;
-            // Checking to find active databases to search in.
-            List<string> existingDatabases = [];
-            string[] tempExistingDatabases = System.IO.Directory.GetFiles(Application.StartupPath, "*.xml*", SearchOption.TopDirectoryOnly);
-            foreach (string database in tempExistingDatabases)
-            {
-                // Just to make sure
-                if (System.IO.Path.GetExtension(database).ToUpper() == ".XML")
-                {
-                    if (fromAllPlaylists == false)
-                    {
-                        if (ownerPlaylistName != null && database.ToUpper().Contains(ownerPlaylistName.ToUpper()))
-                        {
-                            existingDatabases.Add(database);
-                            break;
-                        }
-                    }
-                    else { existingDatabases.Add(database); }
-                }
-            }
-            foreach (string database in existingDatabases)
-            {
-                KhiUtils.SongInfoTools.RemoveSongInfoAndPics(toBeRemovedSong, database);
-            }
-        }
+        
         #endregion
     }
 }

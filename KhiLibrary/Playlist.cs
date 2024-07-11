@@ -9,26 +9,11 @@ namespace KhiLibrary
     /// </summary>
     public class Playlist
     {
-        // *** Add method for Reading database either here or in MusicLibrary
-        // and Add option for the Sort be be either ascending or descending
-        // Notes for myself:
-        // Check if a playlist with the new name exists --> Done
-        // Create an empty xml for the playlist --> Done
-        // Add song to playlist --> Write to playlist --> Done
-        // Remove song from playlist --> Done
-        // Keep all of the songs within --> Done
-        // sort orders based on each of the songs' attributes --> make enum for the songs attributes
-        // make enums for each of the songs?
-
         #region fields
-
-        private int index;
-        private int count;
         private string playlistName;
         private string playlistPath;
         private DateTime creationDate;
         private DateTime lastUpdated;
-
         private Songs songsList;
         #endregion
 
@@ -89,7 +74,6 @@ namespace KhiLibrary
             playlistPath = string.Empty;
             creationDate = DateTime.Now;
             lastUpdated = DateTime.Now;
-            Indexer();
             songsList = new Songs();
         }
 
@@ -99,41 +83,20 @@ namespace KhiLibrary
         /// <param name="name"></param>
         public Playlist(string name)
         {
-            if (!KhiUtils.PlaylistTools.PlaylistAlreadyExists(name))
+            if (!PlaylistTools.PlaylistAlreadyExists(name))
             {
                 playlistName = name;
-                playlistPath = Application.StartupPath + name + ".xml";
+                // To Remove spaces from the name so a file with that name can be created.
+                string tempPath = name.Trim(' ');
+                playlistPath = Application.StartupPath + tempPath + ".xml";
                 creationDate = DateTime.Now;
                 lastUpdated = DateTime.Now;
                 songsList = new Songs(playlistName, playlistPath);
                 CreatePlaylist();
-                Indexer();
-                
             }
             else
             {
-                // add code to load a previously constructed playlist or throw exception or sth like that
-                // Check to see if a playlist with that name exists, gets its path and loads it if there is.
-                var tempSongList = KhiUtils.PlaylistTools.PlaylistReader(name);
-                if (tempSongList != null)
-                {
-                    var path = KhiUtils.PlaylistTools.GetPlaylistPath(name);
-                    if (path != null)
-                    {
-                        Songs newSongs = new Songs(tempSongList, name, path);
-                        if (newSongs != null) 
-                        { 
-                            songsList = newSongs;
-                            // ADD CODE to get the dates from the database
-                            playlistName = string.Empty;
-                            playlistPath = string.Empty;
-                        }
-                    }
-                    
-                    
-                }
-                
-                throw new Exception("A playlist with that name already exists");
+                throw new Exception("A playlist with that name, " + name + ",already exists");
             }
         }
 
@@ -144,7 +107,7 @@ namespace KhiLibrary
         /// <param name="listOfSongs"></param>
         /// <param name="name"></param>
         /// <param name="path"></param>
-        public Playlist (Songs listOfSongs, string name, string path)
+        public Playlist(Songs listOfSongs, string name, string path)
         {
             playlistName = name;
             playlistPath = path;
@@ -152,6 +115,10 @@ namespace KhiLibrary
             creationDate = DateTime.Now;
             lastUpdated = DateTime.Now;
             songsList = listOfSongs;
+            if (!InternalSettings.prepareForVirtualMode)
+            {
+                PrepareSongsArts();
+            }
         }
         #endregion
 
@@ -160,16 +127,47 @@ namespace KhiLibrary
         /// <summary>
         /// Rereads the Songs from the database.
         /// </summary>
-        public void Reload ()
+        public void Reload()
         {
-            // Add Code here --> Should reread from the database
-            var tempSongList = KhiUtils.PlaylistTools.PlaylistReader(playlistName, playlistPath);            
-            Songs newSongs = new Songs(tempSongList, playlistName, playlistPath);
-            if (newSongs != null)
+            var tempSongList = PlaylistTools.PlaylistReader(playlistName, playlistPath);
+            if (tempSongList != null)
             {
+                Songs newSongs = new Songs(tempSongList, playlistName, playlistPath);
                 songsList.Clear();
                 songsList = newSongs;
-            }            
+            }
+            else
+            { throw new Exception("An Error was encountered reading from the playlist Database"); }
+        }
+
+        /// <summary>
+        /// Extracts the album arts of the songs in the playlist ahead of time, to improve performance later on.
+        /// </summary>
+        public void PrepareSongsArts()
+        {
+            Parallel.ForEach(songsList.ToList(), song =>
+            {
+                song.PrepareArt();
+            });
+            GC.WaitForPendingFinalizers();
+            int gen = GC.MaxGeneration;
+            GC.Collect(gen, GCCollectionMode.Aggressive);
+        }
+
+        /// <summary>
+        /// Disposes the loaded album arts of the songs collection and clears memory.
+        /// </summary>
+        /// <param name="deleteTempImages"></param>
+        public void UnloadSongArts(bool deleteTempImages = false)
+        {
+            for (int i = 0; i < songsList.Count; i++)
+            {
+                var song = songsList[i];
+                song.UnloadArt(deleteTempImages);
+            }
+            GC.WaitForPendingFinalizers();
+            int gen = GC.MaxGeneration;
+            GC.Collect(gen, GCCollectionMode.Aggressive);
         }
 
         /// <summary>
@@ -188,9 +186,9 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Clears the songs that exists in the playlist.
+        /// Clears the songs that exists in the playlist and optionally removes them from the playlist.
         /// </summary>
-        public async void Clear()
+        public void Clear(bool removeAllSongs)
         {
             // Could also add the option of removing all of the songs
             songsList.Clear();
@@ -201,29 +199,18 @@ namespace KhiLibrary
         /// Duration(seconds)(3), and Genre(4).
         /// </summary>
         /// <param name="columnNumber"></param>
-        public async void Sort(int columnNumber)
+        public void Sort(int columnNumber)
         {
-            await Task.Run(() =>
-            {
-                songsList = songsList.Sort(columnNumber);
-            });
+            songsList = songsList.Sort(columnNumber);
         }
 
         /// <summary>
         /// Saves the playlist songs.
         /// </summary>
-        public async void Save()
+        public void Save()
         {
-            await Task.Run(() =>
-            {
-                var currentSongs = songsList.ToList();
-                //List<Song> tempSongs = KhiUtils.DataFilteringTools.FilterDuplicates(songsList.ToList(), playlistPath);
-                //if (tempSongs.Count > 0)
-                //{
-                    System.IO.File.Delete(playlistPath);                
-                    KhiUtils.PlaylistTools.PlaylistWriter(playlistPath, playlistName, currentSongs);
-                //}
-            });
+            PlaylistTools.PlaylistWriter(playlistPath, playlistName, songsList.ToArray());
+            lastUpdated = DateTime.Now;
         }
         #endregion
 
@@ -236,7 +223,7 @@ namespace KhiLibrary
         /// <returns></returns>
         private string? SetPlaylistName(string newPlaylistName)
         {
-            if (KhiUtils.PlaylistTools.IsAcceptablePlaylistName(newPlaylistName))
+            if (DataFilteringTools.IsAcceptablePlaylistName(newPlaylistName))
             {
                 try
                 {
@@ -247,7 +234,6 @@ namespace KhiLibrary
                     rootEle = playlistDatabase.DocumentElement;
                     if (rootEle != null) { rootEle.SetAttribute("playlistName", newPlaylistName); }
                     System.IO.File.Move(playlistPath, tempNewPlaylistPath);
-
                     return newPlaylistName;
                 }
                 catch
@@ -259,14 +245,11 @@ namespace KhiLibrary
         /// <summary>
         /// To create an empty Xml for this playlist
         /// </summary>
-        private async void CreatePlaylist()
+        private void CreatePlaylist()
         {
-            await Task.Run(() =>
-            {
-                XDocument playlistDatabase = KhiUtils.PlaylistTools.DatabaseElementCreator(playlistPath, playlistName, songsList.ToList());
-                KhiUtils.PlaylistTools.XmlWritingTool(playlistDatabase, playlistPath);
-                KhiUtils.PlaylistTools.PlaylistRecorder(playlistName, playlistPath);
-            });
+            XDocument playlistDatabase = PlaylistTools.DatabaseElementCreator(playlistPath, playlistName, songsList.ToArray());
+            PlaylistTools.XmlWritingTool(playlistDatabase, playlistPath);
+            PlaylistTools.PlaylistRecorder(playlistName, playlistPath);
         }
 
         /// <summary>
@@ -281,24 +264,6 @@ namespace KhiLibrary
                 System.IO.File.Delete(playlistPath);
             }
         }
-
-        /// <summary>
-        /// Keeps the number of playlists
-        /// </summary>
-        /// <param name="removed"></param>
-        private void Indexer(bool removed = false)
-        {
-            if (removed == false)
-            {
-                index = count;
-                count++;
-            }
-            else
-            {
-                count--;
-            }
-        }
         #endregion
-
     }
 }

@@ -1,6 +1,4 @@
-﻿using System.Windows.Media;
-
-namespace KhiLibrary
+﻿namespace KhiLibrary
 {
     /// <summary>
     /// An object containing a collection of Playlist objects.
@@ -26,10 +24,21 @@ namespace KhiLibrary
         public Playlists(bool loadExistingPlaylists = false)
         {
             playlistsList = new List<Playlist>();
-            if (loadExistingPlaylists) 
+            if (loadExistingPlaylists)
             {
                 LoadExistingDatabases();
-            }           
+                if (playlistsList == null || playlistsList.Count == 0)
+                {
+                    Playlist allSongsPlaylist = new Playlist("AllSongsPlaylist");
+                    playlistsList.Add(allSongsPlaylist);
+                }
+            }
+            else
+            {
+                Playlist allSongsPlaylist = new Playlist("AllSongsPlaylist");
+                playlistsList.Add(allSongsPlaylist);
+            }
+            InternalSettings.CreateDirectories();
         }
 
         #region instanceMethods
@@ -42,7 +51,7 @@ namespace KhiLibrary
             return playlistsList.GetEnumerator();
         }
         /// <summary>
-        /// Indexer -Returns the playlist with the provided index. If requested index is bigger than the number of 
+        /// Returns the playlist with the provided index. If requested index is bigger than the number of 
         /// playlists or if no playlist has been added yet, returns null.
         /// </summary>
         /// <param name="index"></param>
@@ -97,14 +106,14 @@ namespace KhiLibrary
         /// <returns></returns>
         /// <exception cref="ArgumentOutOfRangeException"></exception>
         public Playlist? this[string name]
-        {           
-            get 
+        {
+            get
             {
                 var tempFoundPlaylist = FindPlaylist(name);
                 if (tempFoundPlaylist != null)
                 { return tempFoundPlaylist; }
                 else
-                { return null;}
+                { return null; }
             }
             set
             {
@@ -119,7 +128,7 @@ namespace KhiLibrary
                 }
                 else
                 {
-                    throw new ArgumentOutOfRangeException("A playlist with the specified name does not exist.");
+                    throw new ArgumentOutOfRangeException("A playlist with the specified "+ name +" does not exist.");
                 }
             }
         }
@@ -130,12 +139,12 @@ namespace KhiLibrary
         public void LoadExistingDatabases()
         {
             playlistsList.Clear();
-            var existingPlaylists = KhiUtils.PlaylistTools.ReadPlaylistsRecords();
+            var existingPlaylists = PlaylistTools.ReadPlaylistsRecords();
             if (existingPlaylists != null && existingPlaylists.Count > 0)
             {
                 foreach (var pList in existingPlaylists)
                 {
-                    var tempSongs = KhiUtils.PlaylistTools.PlaylistReader(pList.Key, pList.Value);
+                    var tempSongs = PlaylistTools.PlaylistReader(pList.Key, pList.Value);
                     if (tempSongs != null)
                     {
                         Songs newSongs = new Songs(tempSongs, pList.Key, pList.Value);
@@ -162,9 +171,9 @@ namespace KhiLibrary
         /// <param name="playlistName"></param>
         public void AddPlaylist(string playlistName)
         {
-            if (KhiUtils.PlaylistTools.IsAcceptablePlaylistName(playlistName))
+            if (DataFilteringTools.IsAcceptablePlaylistName(playlistName))
             {
-                playlistsList.Add(new Playlist(playlistName));                       
+                playlistsList.Add(new Playlist(playlistName));
             }
             else
             { throw new Exception("Invalid Playlist Name"); }
@@ -180,7 +189,7 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Adds a collection of Playlist (List<Playlist>) to the database.
+        /// Adds a collection of playlists (List of type Playlist) to the database.
         /// </summary>
         /// <param name="newPlaylistList"></param>
         public void AddRange(List<Playlist> newPlaylistList)
@@ -214,7 +223,7 @@ namespace KhiLibrary
         /// <returns></returns>
         public Playlist? FindPlaylist(string playlistName)
         {
-            foreach (Playlist playlist in playlistsList)
+            foreach (var playlist in playlistsList)
             {
                 if (playlist.Name == playlistName)
                 {

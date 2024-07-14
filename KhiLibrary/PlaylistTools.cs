@@ -10,8 +10,8 @@ namespace KhiLibrary
     internal static class PlaylistTools
     {
         /// <summary>
-        /// Checks if a playlist with the name already exists, returns true if there is 
-        /// and false if the there is no playlist with this name.  
+        /// Checks if a playlist with the name already exists, returns true if there is
+        /// and false if the there is no playlist with this name.
         /// </summary>
         /// <param name="name"></param>
         /// <returns></returns>
@@ -30,7 +30,7 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Finds playlists, and Removes the specified song from this playlist, and optionally 
+        /// Finds playlists, and Removes the specified song from this playlist, and optionally
         /// from all playlists.
         /// </summary>
         /// <param name="toBeRemovedSong"></param>
@@ -102,7 +102,7 @@ namespace KhiLibrary
                 // Creating the elements
                 // Each element will contain a child, the playlistPath
                 // The elements name will be the same as the playlist's name
-                XElement newPlaylist = new(playlistName, playlistPath);
+                XElement newPlaylist = new(playlistName.Replace(' ', '_'), playlistPath);
                 // We then Add it to the root document
                 playlists.Add(newPlaylist);
                 // Saves the Document
@@ -132,7 +132,7 @@ namespace KhiLibrary
                         {
                             try
                             {
-                                playlistsDic.Add(playlist.Name.LocalName, playlist.Value);
+                                playlistsDic.Add(playlist.Name.LocalName.Replace('_', ' '), playlist.Value);
                             }
                             catch { }
                         }
@@ -147,8 +147,8 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Finds and returns the path of a playlist's database using its name. returns null 
-        /// string if a playlist with that name does not not exist.
+        /// Finds and returns the path of a playlist's database using its name. returns null
+        /// string if a playlist with that name does not exist.
         /// </summary>
         /// <param name="playlistName"></param>
         /// <returns></returns>
@@ -175,8 +175,8 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Creates or Opens an Xml Document from/in the provided path, with the mentioned playlist name included 
-        /// and creates xml elements based on the selected songs' propertiest. 
+        /// Creates or Opens an Xml Document from/in the provided path, with the mentioned playlist name included
+        /// and creates xml elements based on the selected songs' propertiest.
         /// </summary>
         /// <param name="playlistPath"></param>
         /// <param name="nameOfPlaylist"></param>
@@ -200,7 +200,7 @@ namespace KhiLibrary
                 }
                 else
                 {
-                    playlistSongs = new XElement(nameOfPlaylist);
+                    playlistSongs = new XElement(nameOfPlaylist.Replace(' ', '_'));
                     playlistSongs.SetAttributeValue("playlist", nameOfPlaylist);
                     playlistSongs.SetAttributeValue("creationDate", DateTime.Now);
                     playlistSongs.SetAttributeValue("lastUpdated", DateTime.Now);
@@ -210,7 +210,7 @@ namespace KhiLibrary
             else
             {
                 playlistDatabase = new XDocument();
-                playlistSongs = new XElement(nameOfPlaylist);
+                playlistSongs = new XElement(nameOfPlaylist.Replace(' ', '_'));
                 playlistSongs.SetAttributeValue("playlist", nameOfPlaylist);
                 playlistSongs.SetAttributeValue("lastUpdated", DateTime.Now);
                 playlistDatabase.Add(playlistSongs);
@@ -289,8 +289,8 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Returns a Dictionary of string, string, comprised of playlist names as the keys, and playlist paths as the value. 
-        /// Returns null if no playlist is found or an exception is thrown. 
+        /// Returns a Dictionary of string, string, comprised of playlist names as the keys, and playlist paths as the value.
+        /// Returns null if no playlist is found or an exception is thrown.
         /// </summary>
         /// <returns></returns>
         internal static Dictionary<string, string>? PlaylistDatabaseFinder()

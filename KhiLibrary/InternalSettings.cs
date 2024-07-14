@@ -6,12 +6,13 @@
     internal static class InternalSettings
     {
         internal static string applicationPath = System.Windows.Forms.Application.StartupPath;
-        internal static string allMusicDataBase = applicationPath + "AllMusicDataBase.xml";
-        internal static string playlistsRecord = applicationPath + "PlaylistsRecord.xml";
+        
         internal static string albumArtsPath = applicationPath + "\\Album Arts\\";
         internal static string albumArtsThumbnailsPath = applicationPath + "Album Arts Thumbnails\\";
         internal static string tempArtsFolder = applicationPath + "\\Temp\\";
         internal static string playlistsFolder = applicationPath + "\\Playlists\\";
+        internal static string allMusicDataBase = playlistsFolder + "AllMusicDataBase.xml";
+        internal static string playlistsRecord = playlistsFolder + "PlaylistsRecord.xml";
         internal static bool doNotAddDuplicateSongs = false;
         internal static bool prepareForVirtualMode = true;
 

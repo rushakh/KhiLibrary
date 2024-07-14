@@ -1,4 +1,6 @@
-﻿namespace KhiLibrary
+﻿using System.Xml.Linq;
+
+namespace KhiLibrary
 {
     /// <summary>
     /// An object containing a collection of Playlist objects.
@@ -23,19 +25,20 @@
         /// </summary>
         public Playlists(bool loadExistingPlaylists = false)
         {
+            InternalSettings.CreateDirectories();
             playlistsList = new List<Playlist>();
             if (loadExistingPlaylists)
             {
                 LoadExistingDatabases();
                 if (playlistsList == null || playlistsList.Count == 0)
                 {
-                    Playlist allSongsPlaylist = new Playlist("AllSongsPlaylist");
+                    Playlist allSongsPlaylist = new Playlist("All Songs Playlist");
                     playlistsList.Add(allSongsPlaylist);
                 }
             }
             else
             {
-                Playlist allSongsPlaylist = new Playlist("AllSongsPlaylist");
+                Playlist allSongsPlaylist = new Playlist("All Songs Playlist");
                 playlistsList.Add(allSongsPlaylist);
             }
             InternalSettings.CreateDirectories();
@@ -110,10 +113,7 @@
             get
             {
                 var tempFoundPlaylist = FindPlaylist(name);
-                if (tempFoundPlaylist != null)
-                { return tempFoundPlaylist; }
-                else
-                { return null; }
+                return tempFoundPlaylist;
             }
             set
             {
@@ -196,10 +196,7 @@
         {
             if (newPlaylistList != null && newPlaylistList.Count > 0)
             {
-                foreach (Playlist playlist in newPlaylistList)
-                {
-                    playlistsList.Add(playlist);
-                }
+                playlistsList.AddRange(newPlaylistList);
             }
         }
 
@@ -217,7 +214,7 @@
         }
 
         /// <summary>
-        /// Search for a playlist by its name (case incensitive).
+        /// Search for a playlist by its name (case insensitive).
         /// </summary>
         /// <param name="playlistName"></param>
         /// <returns></returns>
@@ -235,20 +232,82 @@
         }
 
         /// <summary>
+        /// Exports all the playlists as .m3u8 files
+        /// </summary>
+        public string[] ExportAllPlaylists ()
+        {
+            List<string> exportedPlaylistsPaths = new List<string>();
+            foreach (Playlist playlist in playlistsList)
+            {
+                try
+                {
+                    string exportedFilePath = playlist.ExportPlaylist();
+                    exportedPlaylistsPaths.Add(exportedFilePath);
+                }
+                catch
+                { continue; }
+            }
+            return exportedPlaylistsPaths.ToArray();
+        }
+
+        /// <summary>
+        /// Imports a playlist (.m3u or .m3u8 files). In case the playlists with the imported playlists' names
+        /// already exist, will add a number to the end of their names.
+        /// </summary>
+        /// <param name="m3uOrM3u8FilePath"></param>
+        public void ImportPlaylist (string m3uOrM3u8FilePath)
+        {
+            (string importedPlaylistName, string[] importedPlaylistSongsPaths) = KhiUtils.ExtractSongsPathsFromM3uPlaylist(m3uOrM3u8FilePath);
+            string tempDatabaseName = importedPlaylistName.Trim(' ');
+            string playlistDatabasePath = InternalSettings.playlistsFolder + tempDatabaseName + ".xml";
+            // Just in case a playlist with that name already exists
+            int i = 0;
+            while (System.IO.File.Exists(playlistDatabasePath))
+            {
+                importedPlaylistName = importedPlaylistName + i;
+                tempDatabaseName = importedPlaylistName.Trim(' ');
+                playlistDatabasePath = InternalSettings.playlistsFolder + tempDatabaseName + ".xml";
+                i++;
+            }
+            Songs importedPlaylistSongs = new Songs(importedPlaylistName, playlistDatabasePath);
+            importedPlaylistSongs.AddRange(importedPlaylistSongsPaths);
+            Playlist newImportedPlaylist = new Playlist(importedPlaylistSongs, importedPlaylistName, playlistDatabasePath);
+        }
+
+        /// <summary>
+        /// Imports multiple playlists (.m3u or .m3u8 files). In case the playlists with the imported playlists' names
+        /// already exist, will add a number to the end of their names. Optionally, will add the playlists in parallel
+        /// which will be faster if the imported playlists are large but as a consequence they will not be added in the 
+        /// order they were added, and the process will be accompanied by a sudden spike in RAM and CPU usage.
+        /// </summary>
+        /// <param name="m3uOrM3u8FilePaths"></param>
+        /// <param name="AddPlaylistsInParallel"></param>
+        public void ImportPlaylists(string[] m3uOrM3u8FilePaths, bool AddPlaylistsInParallel = false)
+        {
+            if (AddPlaylistsInParallel)
+            {
+                Parallel.ForEach(m3uOrM3u8FilePaths, m3uOrM3u8FilePath =>
+                {
+                    ImportPlaylist(m3uOrM3u8FilePath);
+                });
+            }
+            else
+            {
+                foreach (string m3uOrM3u8FilePath in m3uOrM3u8FilePaths)
+                {
+                    ImportPlaylist(m3uOrM3u8FilePath);
+                }
+            }    
+        }
+
+        /// <summary>
         /// Remove
         /// </summary>
         /// <param name="toBeRemovePlaylist"></param>
         public async void RemovePlaylist(Playlist toBeRemovePlaylist)
         {
-            await Task.Run(() =>
-            {
-                playlistsList.Remove(toBeRemovePlaylist);
-            });
+            await Task.Run(() => playlistsList.Remove(toBeRemovePlaylist));
         }
-
-        #endregion
-
-        #region privateInnerWorkings
 
         #endregion
     }

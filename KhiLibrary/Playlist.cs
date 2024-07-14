@@ -87,8 +87,8 @@ namespace KhiLibrary
             {
                 playlistName = name;
                 // To Remove spaces from the name so a file with that name can be created.
-                string tempPath = name.Trim(' ');
-                playlistPath = Application.StartupPath + tempPath + ".xml";
+                //string tempDatabaseName = name.Trim(' ');
+                playlistPath = InternalSettings.playlistsFolder + playlistName + ".xml";
                 creationDate = DateTime.Now;
                 lastUpdated = DateTime.Now;
                 songsList = new Songs(playlistName, playlistPath);
@@ -123,6 +123,31 @@ namespace KhiLibrary
         #endregion
 
         #region instanceMethods
+
+        /// <summary>
+        /// Adds the songs in this playlist to the playback queue.
+        /// </summary>
+        public void AddToQueue()
+        {
+            MusicPlayer.Queue.AddRangeToQueue(songsList.ToList());
+        }
+
+        /// <summary>
+        /// Removes the songs in this playlist from the playback queue.
+        /// </summary>
+        public void RemoveFromQueue()
+        {
+            MusicPlayer.Queue.RemoveRangeFromQueue(songsList.ToList());
+        }
+
+        /// <summary>
+        /// Exports the current playlist as an m3u8 and returns the location of the exported file.
+        /// </summary>
+        public string ExportPlaylist()
+        {
+            string exportedPlaylistPath = KhiUtils.ExportPlaylistAsM3u(playlistName, songsList.ToList());
+            return exportedPlaylistPath;
+        }
 
         /// <summary>
         /// Rereads the Songs from the database.
@@ -195,7 +220,7 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Sorts the songs inside the playlist based on their Title (0), Artist (1), Album (2), 
+        /// Sorts the songs inside the playlist based on their Title (0), Artist (1), Album (2),
         /// Duration(seconds)(3), and Genre(4).
         /// </summary>
         /// <param name="columnNumber"></param>
@@ -259,7 +284,7 @@ namespace KhiLibrary
         private static void RemovePlaylist(string playlistPath)
         {
             var temp = playlistPath.Split('.', StringSplitOptions.None);
-            if (System.IO.File.Exists(playlistPath) && temp.Last().ToLower() == "xml")
+            if (System.IO.File.Exists(playlistPath) && DataFilteringTools.AreTheSame (temp.Last(), "xml", true))
             {
                 System.IO.File.Delete(playlistPath);
             }

@@ -179,10 +179,13 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Adds several songs to the playlist using their paths.
+        /// Adds several songs to the playlist using their paths. Optionally, will add songs in parallel which 
+        /// will be faster for large number of songs but in that case the songs will not be added in the order they 
+        /// were given and the process will be accompanied by a sudden spike in RAM and CPU usage.
         /// </summary>
         /// <param name="audioPaths"></param>
-        public void AddRange(string[] audioPaths)
+        /// <param name="AddSongsInParallel"></param>
+        public void AddRange(string[] audioPaths , bool AddSongsInParallel = false)
         {
             var actualAudioPaths = DataFilteringTools.FilterFilesBasedOnExtention(audioPaths);
             string[] checkedAudios;
@@ -197,19 +200,23 @@ namespace KhiLibrary
             if (checkedAudios != null && checkedAudios.Length > 0)
             {
                 List<Song> tempSongsList = [];
-                /*
-                for (int i =0; i<checkedAudios.Length; i++)
+                if (AddSongsInParallel)
                 {
-                    string audioPath = audioPaths[i];
-                    Song newSong = new Song(audioPath);
-                    tempSongsList.Add(newSong);
+                    Parallel.ForEach(checkedAudios, audioPath =>
+                    {
+                        Song newSong = new(audioPath);
+                        tempSongsList.Add(newSong);
+                    });
                 }
-                */
-                Parallel.ForEach(checkedAudios, audioPath =>
+                else
                 {
-                    Song newSong = new(audioPath);
-                    tempSongsList.Add(newSong);
-                });
+                    for (int i = 0; i < checkedAudios.Length; i++)
+                    {
+                        string audioPath = audioPaths[i];
+                        Song newSong = new Song(audioPath);
+                        tempSongsList.Add(newSong);
+                    }
+                }
                 songs.AddRange(tempSongsList.ToArray());
                 songs.TrimExcess();
                 tempSongsList.Clear();
@@ -250,6 +257,14 @@ namespace KhiLibrary
                 }
                 
             }
+        }
+
+        /// <summary>
+        /// Adds the songs in this collection to the playback queue.
+        /// </summary>
+        public void AddToQueue ()
+        {
+
         }
 
         /// <summary>
@@ -294,18 +309,14 @@ namespace KhiLibrary
                     else if (DataFilteringTools.AreTheSame(song.Title, title, true))
                     {
                         tempSongs.Add(song);
-                    }
-                    else
-                    { return null; }
-
-                    if (tempSongs.Count == 0) { return null; }
-                    else { return tempSongs[0]; }
+                    }                  
                 }
+                if (tempSongs.Count == 0) { return null; }
+                else { return tempSongs[0]; }
             }
             else
             { return null; }
             // If the code has reached up to here, then sth is wrong
-            return null;
         }
 
         /// <summary>

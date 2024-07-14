@@ -188,20 +188,24 @@ namespace KhiLibrary
             /// <returns></returns>
             internal static Image GetArt(string artPath)
             {
-                Image? art;
                 try
                 {
                     if (System.IO.File.Exists(artPath))
                     {
-                        art = Image.FromFile(artPath);
+                        Image tempArt = Image.FromFile(artPath);
+                        Bitmap art = new Bitmap(tempArt, tempArt.Size);
+                        tempArt.Dispose();
+                        return art;
                     }
                     else
                     {
-                        art = KhiLibrary.Resources.Khi_Player;
+                        return KhiLibrary.Resources.Khi_Player;
                     }
                 }
-                catch { art = KhiLibrary.Resources.Khi_Player; }
-                return art;
+                catch 
+                { 
+                    return KhiLibrary.Resources.Khi_Player;
+                }
             }
 
             /// <summary>
@@ -347,11 +351,13 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Gets and returns an aido file's Info; title, artist, album, etc.
+        /// Gets and returns an aido file's Info; title, artist, album, etc. Saves the art in case the application 
+        /// is not in virtual mode or if this song is going to played immediatly after the creation of the Song object.
         /// </summary>
         /// <param name="audioFilePath"></param>
+        /// <param name="willBePlayedImmediatly"></param>
         /// <returns></returns>
-        internal static string[] GetInfo(string audioFilePath)
+        internal static string[] GetInfo(string audioFilePath, bool willBePlayedImmediatly = false)
         {
             try
             {
@@ -389,7 +395,11 @@ namespace KhiLibrary
                         thumbnail.Save(thumbnailPath, ImageFormat.Png);
                         thumbnail.Dispose();
                         thumbnail = null;
-                        if (!InternalSettings.prepareForVirtualMode)
+                        // Should save the album art itself as well if the application is not going to be used in
+                        // virtual mode or if this song was chosen to be played immediatly from outside the application
+                        // (e.g., Open With context menu). If it's going to be played immediatly, the album art should
+                        // be ready so as not open the file again and create the image.
+                        if (!InternalSettings.prepareForVirtualMode || willBePlayedImmediatly)
                         {
                             string fileName = System.IO.Path.GetFileNameWithoutExtension(path);
                             artPath = InternalSettings.tempArtsFolder + fileName + ".jpeg";

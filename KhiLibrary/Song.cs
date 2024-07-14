@@ -4,7 +4,7 @@ using System.Drawing;
 namespace KhiLibrary
 {
     /// <summary>
-    /// An object containing an audio file's information (title, artist, album, location, duration, genres, lyrics, 
+    /// Can be used to create an object containing an audio file's information (title, artist, album, location, duration, genres, lyrics, 
     /// art, thumbnail)
     /// </summary>
     public class Song
@@ -157,15 +157,8 @@ namespace KhiLibrary
         {
             get 
             {
-                if (art == null)
-                {
-                    PrepareArt();
-                    return SongInfoTools.FetchSongInfo.GetArt(path);
-                }
-                else
-                { 
-                    return art; 
-                }
+                if (!System.IO.File.Exists(artPath)) { PrepareArt(); }
+                return SongInfoTools.FetchSongInfo.GetArt(artPath);
             }
             set
             {
@@ -211,14 +204,17 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Creates an instance of the Song class, using an audio file's path.
+        /// Creates an instance of the Song class, using an audio file's path. set willBePlayedImmediatly to true 
+        /// If this song is going to be played immediatly after its construction.
         /// </summary>
         /// <param name="audioFilePath"></param>
-        public Song(string audioFilePath)
+        /// <param name="willBePlayedImmediatly"></param>
+        /// <exception cref="FileNotFoundException"></exception>
+        public Song(string audioFilePath, bool willBePlayedImmediatly = false)
         {
             if (System.IO.File.Exists(audioFilePath))
             {
-                string[]? tempInfo = SongInfoTools.GetInfo(audioFilePath);
+                string[]? tempInfo = SongInfoTools.GetInfo(audioFilePath, willBePlayedImmediatly);
                 string[]? songInfo = tempInfo.ToArray();
                 tempInfo = null;
                 title = songInfo[0];
@@ -226,7 +222,7 @@ namespace KhiLibrary
                 album = songInfo[2];
                 path = songInfo[3];
                 string fileName = System.IO.Path.GetFileNameWithoutExtension(path);
-                artPath = InternalSettings.tempArtsFolder + fileName + ".png";
+                artPath = InternalSettings.tempArtsFolder + fileName + ".jpeg";
                 thumbnailPath = songInfo[4];
                 genres = songInfo[5];
                 lyrics = songInfo[6];
@@ -382,6 +378,22 @@ namespace KhiLibrary
                     throw new ArgumentException("Value must be an instance of the Song class and not null.");
                 }
             }
+        }
+
+        /// <summary>
+        /// Adds this song to the playback queue.
+        /// </summary>
+        public void AddToQueue ()
+        {
+            MusicPlayer.Queue.AddToQueue(this);
+        }
+
+        /// <summary>
+        /// Removes this song from the playback queue.
+        /// </summary>
+        public void RemoveFromQueue()
+        {
+            MusicPlayer.Queue.RemoveFromQueue(this);
         }
 
         /// <summary>

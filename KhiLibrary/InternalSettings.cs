@@ -13,6 +13,7 @@
         internal static string playlistsFolder = applicationPath + "\\Playlists\\";
         internal static string allMusicDataBase = playlistsFolder + "AllMusicDataBase.xml";
         internal static string playlistsRecord = playlistsFolder + "PlaylistsRecord.xml";
+        internal static string equalizersProfilesPath = applicationPath + "Equalizers Profiles.xml";
         internal static bool doNotAddDuplicateSongs = false;
         internal static bool prepareForVirtualMode = true;
 

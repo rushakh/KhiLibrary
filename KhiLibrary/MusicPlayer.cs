@@ -11,12 +11,14 @@ namespace KhiLibrary
         private static PlaybackQueue playbackQueue = new PlaybackQueue();
         private static AudioFileReader? chosenSong;
         private static WaveOutEvent AudioPlayer = new WaveOutEvent();
+        private static Equalizer equalizer = new Equalizer();
         private static bool playbackStoppedManually = false;
         private static bool isFirstTime = true;
         private static int numberOfBuffers = 3;
         private static int desiredLatency = 200;
         private static float desiredVolume = (float)1.0;
         private static bool enableSingleSongLoop;
+        private static bool useEqualizer = false;
 
         /// <summary>
         /// The queue that is used for playback. Songs should be added here
@@ -74,6 +76,24 @@ namespace KhiLibrary
         /// Enables shuffle mode for the queue, shuffling the songs in the queue.
         /// </summary>
         public static bool EnableShuffle { get => playbackQueue.EnableShuffle; set => playbackQueue.EnableShuffle = value; }
+
+        /// <summary>
+        /// Enables and disables the equalizer. Change equalizer setting using the Equalizer.
+        /// </summary>
+        public static bool UseEqualizer
+        {
+            get => useEqualizer;
+            set
+            {
+                useEqualizer = value;
+                UpdateEqualizer();
+            }
+        }
+
+        /// <summary>
+        /// A 10 band equalizer, change the gains using its properties, then update
+        /// </summary>
+        public static Equalizer Equalizer { get => equalizer; set => equalizer = value; }
 
         /// <summary>
         /// Shows the current state of the Music Player.
@@ -148,7 +168,7 @@ namespace KhiLibrary
         {
             try
             {
-                //playbackQueue.CurrentSong.UnloadArt();
+                //playbackQueue.CurrentSong.UnloadArt();             
                 playbackQueue.MoveToNext();
                 PrepareAndPlayTheSong();
             }
@@ -203,10 +223,22 @@ namespace KhiLibrary
         /// <param name="timeForSongToStartPlayingFrom"></param>
         public static void SetCurrentTimeInPlayback(TimeSpan timeForSongToStartPlayingFrom)
         {
+            // Won't throw exceptions here, Naudio will do that and checking if the time is actually correct would be of no use
             if (chosenSong != null)
             {
                 chosenSong.CurrentTime = timeForSongToStartPlayingFrom;
             }
+        }
+
+        /// <summary>
+        /// Returns the total duration of the song that is playing/paused right now.
+        /// </summary>
+        /// <returns></returns>
+        public static TimeSpan GetPlayingSongMaxDuration()
+        {
+            var tempTotallTime = chosenSong.TotalTime;
+            // need to check if it is in correct format later.
+            return tempTotallTime;
         }
 
         /// <summary>
@@ -225,14 +257,59 @@ namespace KhiLibrary
                 AudioPlayer = new WaveOutEvent();
                 AudioPlayer.PlaybackStopped += AudioPlayer_PlaybackStopped;
                 SetAudioPlayerSettings();
-                AudioPlayer.Init(chosenSong);
+                if (useEqualizer)
+                {
+                    var equalizedSong = equalizer.EqualizeSong(chosenSong);
+                    AudioPlayer.Init(equalizedSong);
+                }
+                else
+                {
+                    AudioPlayer.Init(chosenSong);
+                }
                 AudioPlayer.Play();
+                playbackStoppedManually = false;
             }
             catch
             {
                 chosenSong = new AudioFileReader(playbackQueue.CurrentSong.Path);
                 AudioPlayer.Init(chosenSong);
                 AudioPlayer.Play();
+            }
+        }
+
+        /// <summary>
+        /// Should be called when a song is playing and the equalizer bands' gains have been updated
+        /// </summary>
+        private static void UpdateEqualizer()
+        {
+            equalizer.UpdateBands();
+            int state = 1;
+            if (AudioPlayer.PlaybackState == PlaybackState.Playing) { state = 1; }
+            else if (AudioPlayer.PlaybackState == PlaybackState.Paused) { state = 2; }
+            if (state == 1 || state == 2)
+            {
+                playbackStoppedManually = true;
+                AudioPlayer.PlaybackStopped -= AudioPlayer_PlaybackStopped;
+                if (AudioPlayer != null) { AudioPlayer.Dispose(); }
+                AudioPlayer = new WaveOutEvent();
+                AudioPlayer.PlaybackStopped += AudioPlayer_PlaybackStopped;
+                SetAudioPlayerSettings();
+                if (useEqualizer)
+                {
+                    var equalizedSong = equalizer.EqualizeSong(chosenSong);
+                    AudioPlayer.Init(equalizedSong);
+                }
+                else
+                {
+                    AudioPlayer.Init(chosenSong);
+                }
+                if (state == 1) { AudioPlayer.Play(); }
+                else if (state == 2) 
+                { 
+                    AudioPlayer.Play();
+                    AudioPlayer.Pause();
+                }
+                playbackStoppedManually = false;
             }
         }
 
@@ -270,7 +347,7 @@ namespace KhiLibrary
             }
             else
             {
-                playbackStoppedManually = false;
+                //playbackStoppedManually = false;
             }
         }
     }

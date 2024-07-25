@@ -147,7 +147,6 @@ namespace KhiLibrary
             {
                 songs.Add(newSong);
                 songsListLastUpdated = DateTime.Now;
-                //PlaylistTools.SongWriter(ownerPlaylistPath, ownerPlaylistName, newSong);
                 calculateTotallPlaytime();
             }
         }
@@ -164,7 +163,6 @@ namespace KhiLibrary
                 bool isDuplicate = DataFilteringTools.CheckForDuplicate(newSong, ownerPlaylistPath);
                 if (!isDuplicate)
                 {
-                    //PlaylistTools.SongWriter(ownerPlaylistPath, ownerPlaylistName, newSong);
                     songs.Add(newSong);
                     songsListLastUpdated = DateTime.Now;
                     calculateTotallPlaytime();
@@ -212,7 +210,7 @@ namespace KhiLibrary
                 {
                     for (int i = 0; i < checkedAudios.Length; i++)
                     {
-                        string audioPath = audioPaths[i];
+                        string audioPath = checkedAudios[i];
                         Song newSong = new Song(audioPath);
                         tempSongsList.Add(newSong);
                     }
@@ -277,14 +275,15 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// *In Need Of Improvements- Finds and returns a song within the list using its Title (case insensitive), and optionally for a more accurate result, 
-        /// using its Artist and Album.
+        /// Finds and returns a song within the list using its Title (case insensitive), and optionally for a more accurate result, 
+        /// using its Artist and Album. *** Using Linq query seems to load lyrics and images as well which is why it is not used, 
+        /// at least not until I find a solution.
         /// </summary>
         /// <param name="title"></param>
         /// <param name="artist"></param>
         /// <param name="album"></param>
         /// <returns></returns>
-        public Song? Find(string title, string artist = "", string album = "")
+        public Song? FindExact(string title, string artist, string album)
         {
             Song foundSong;
             List<Song> tempSongs = [];
@@ -292,31 +291,81 @@ namespace KhiLibrary
             {
                 foreach (Song song in songs)
                 {
-                    if (DataFilteringTools.AreTheSame(song.Title, title, true) && DataFilteringTools.AreTheSame(song.Artist, artist, true) &&
-                        DataFilteringTools.AreTheSame(song.Album, album, true))
+                    if (DataFilteringTools.AreTheSame(song.Title, title) &&
+                        DataFilteringTools.AreTheSame(song.Artist, artist) &&
+                        DataFilteringTools.AreTheSame(song.Album, album))
                     {
                         foundSong = song;
                         return foundSong;
-                    }
-                    else if (DataFilteringTools.AreTheSame(song.Title, title, true) && DataFilteringTools.AreTheSame(song.Artist, artist))
-                    {
-                        tempSongs.Add(song);
-                    }
-                    else if (DataFilteringTools.AreTheSame(song.Title, title, true) && DataFilteringTools.AreTheSame(song.Album, album))
-                    {
-                        tempSongs.Add(song);
-                    }
-                    else if (DataFilteringTools.AreTheSame(song.Title, title, true))
-                    {
-                        tempSongs.Add(song);
-                    }                  
+                    }              
                 }
-                if (tempSongs.Count == 0) { return null; }
-                else { return tempSongs[0]; }
+                return null;
             }
             else
             { return null; }
             // If the code has reached up to here, then sth is wrong
+        }
+
+        /// <summary>
+        /// Finds and returns a list of songs (type Song) with the specified Title or Artist. By default searches for 
+        /// title (set <paramref name="isTitle"/> to false to search for artist). Set <paramref name="withExactWord"/> to 
+        /// false to also include results that contain the specified word as well. 
+        /// *** Using Linq query seems to load lyrics and images of every song in the resulting list as well
+        /// which is why it is not used, at least not until I find a solution.
+        /// </summary>
+        /// <param name="titleOrArtist"></param>
+        /// <param name="isTitle"></param>
+        /// <param name="withExactWord"></param>
+        /// <returns></returns>
+        public List<Song>? Find(string titleOrArtist, bool isTitle = true, bool withExactWord = true)
+        {
+            if (songs != null && songs.Count > 0)
+            {
+                List<Song> foundSongs = new List<Song>();
+                for (int i =0; i< songs.Count; i++)
+                {
+                    if (isTitle)
+                    {
+                        if (withExactWord)
+                        {
+                            if (DataFilteringTools.AreTheSame(songs[i].Title, titleOrArtist))
+                            {
+                                foundSongs.Add(songs[i]);
+                            }
+                        }
+                        else
+                        {
+                            if (songs[i].Title.Contains(titleOrArtist))
+                            {
+                                foundSongs.Add(songs[i]);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (withExactWord)
+                        {
+                            if (DataFilteringTools.AreTheSame(songs[i].Artist, titleOrArtist))
+                            {
+                                foundSongs.Add(songs[i]);
+                            }
+                        }
+                        else
+                        {
+                            if (songs[i].Artist.Contains(titleOrArtist))
+                            {
+                                foundSongs.Add(songs[i]);
+                            }
+                        }
+                    }                
+                }
+                if (foundSongs.Count > 0) { return foundSongs; }
+                else { return null; }
+            }
+            else
+            {
+                return null;
+            }
         }
 
         /// <summary>

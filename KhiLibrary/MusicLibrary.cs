@@ -54,13 +54,5 @@
             /// </summary>
             public static bool PrepareForVirtualMode { get { return InternalSettings.prepareForVirtualMode; } set { InternalSettings.prepareForVirtualMode = value; } }
         }
-
-        /*
-        public MusicLibrary()
-        {
-            Playlists playlistCollection = new Playlists();
-            playlistList = playlistCollection;
-        }
-        */
     }
 }

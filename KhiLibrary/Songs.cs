@@ -1,5 +1,4 @@
-﻿using System.Windows.Forms;
-
+﻿
 namespace KhiLibrary
 {
     /// <summary>
@@ -156,13 +155,13 @@ namespace KhiLibrary
         /// </summary>
         /// <param name="audioPath"></param>
         public void AddSong(string audioPath)
-        {
-            Song newSong = new(audioPath);
+        {           
             if (InternalSettings.doNotAddDuplicateSongs)
             {
-                bool isDuplicate = DataFilteringTools.CheckForDuplicate(newSong, ownerPlaylistPath);
+                bool isDuplicate = DataFilteringTools.CheckIfDuplicate(audioPath, ownerPlaylistPath);
                 if (!isDuplicate)
                 {
+                    Song newSong = new(audioPath);
                     songs.Add(newSong);
                     songsListLastUpdated = DateTime.Now;
                     calculateTotallPlaytime();
@@ -170,9 +169,14 @@ namespace KhiLibrary
             }
             else
             {
-                songs.Add(newSong);
-                songsListLastUpdated = DateTime.Now;
-                calculateTotallPlaytime();
+                bool isMusic = DataFilteringTools.IsAcceptableFormat(audioPath);
+                if (isMusic)
+                {
+                    Song newSong = new(audioPath);
+                    songs.Add(newSong);
+                    songsListLastUpdated = DateTime.Now;
+                    calculateTotallPlaytime();
+                }
             }
         }
 
@@ -262,7 +266,7 @@ namespace KhiLibrary
         /// </summary>
         public void AddToQueue ()
         {
-
+            MusicPlayer.Queue.AddRangeToQueue(songs);
         }
 
         /// <summary>

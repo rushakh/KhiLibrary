@@ -215,8 +215,7 @@ namespace KhiLibrary
             if (System.IO.File.Exists(audioFilePath))
             {
                 string[]? tempInfo = SongInfoTools.GetInfo(audioFilePath, willBePlayedImmediatly);
-                string[]? songInfo = tempInfo.ToArray();
-                tempInfo = null;
+                string[]? songInfo = tempInfo.ToArray();               
                 title = songInfo[0];
                 artist = songInfo[1];
                 album = songInfo[2];
@@ -250,6 +249,7 @@ namespace KhiLibrary
                     else { trackNumber = 0; }
                 }
                 else { trackNumber = 0; }
+                tempInfo = null;
                 songInfo = null;
             }
             else

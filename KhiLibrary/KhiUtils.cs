@@ -8,6 +8,31 @@ namespace KhiLibrary
     public static class KhiUtils
     {
         /// <summary>
+        /// Will check if the file at the specified location is in use by another process and locked. Returns true if in use by another 
+        /// process or other IO Exceptions, otherwise returns false.
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <returns></returns>
+        internal static bool IsFileLocked(string filePath)
+        {
+            bool isLocked = false;
+            try
+            {
+                using (FileStream checkIfLockedStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+                {
+                    // Don't need to do anything with the stream, only to check if a stream can form. if it can, then the file is not locked.
+                    checkIfLockedStream.Close();
+                    isLocked = false;
+                }
+            }
+            catch (IOException e) when ((e.HResult & 0x0000FFFF) == 32 || (e.HResult & 0x0000FFFF) == 33)
+            {
+                isLocked = true;
+            }
+            return isLocked;
+        }
+        
+        /// <summary>
         /// Exports the playlist to a .M3U8 file that can be used in other applications. Returns the path to the exported file.
         /// </summary>
         /// <param name="playlistName"></param>
@@ -103,6 +128,11 @@ namespace KhiLibrary
             catch { }
         }
 
+        /// <summary>
+        /// Extracts a number of songs' embedded album art, saving them to the specified directory.
+        /// </summary>
+        /// <param name="audioFilesPaths"></param>
+        /// <param name="artDestinationDirectory"></param>
         internal static void AlbumArtExtractorBatch(string[] audioFilesPaths, string artDestinationDirectory)
         {
             for (int i = 0; i < audioFilesPaths.Length; i++)
@@ -115,6 +145,11 @@ namespace KhiLibrary
             GC.Collect(gen, GCCollectionMode.Aggressive);
         }
 
+        /// <summary>
+        /// Extracts an audio file's embedded album art, saving it to the specified location.
+        /// </summary>
+        /// <param name="audioFilePath"></param>
+        /// <param name="artDestinationDirectory"></param>
         internal static void AlbumArtExtractor(string audioFilePath, string artDestinationDirectory)
         {
             try

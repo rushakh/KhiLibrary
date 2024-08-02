@@ -407,7 +407,7 @@ namespace KhiLibrary
                     // All the elements have been read, and Song objects have been turned into a list.
                     return songsInPlaylist;
                 }
-                else { }//songsInPlaylist = null; }
+                else { }
             }
             return songsInPlaylist;
         }

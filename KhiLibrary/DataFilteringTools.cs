@@ -231,6 +231,32 @@ namespace KhiLibrary
         }
 
         /// <summary>
+        /// Checks whether the mentioned audio file exists in the playlist. 
+        /// </summary>
+        /// <param name="audioFilePath"></param>
+        /// <param name="playlistPath"></param>
+        /// <returns></returns>
+        internal static bool CheckIfDuplicate(string audioFilePath, string playlistPath)
+        {
+            bool isDuplicate = false;
+            XDocument playlistDataBase = XDocument.Load(playlistPath);
+            XElement? playlistSongs = playlistDataBase.Root; //the document root node
+            if (playlistSongs != null && playlistSongs.HasElements)
+            {
+                foreach (XElement playlistSong in playlistSongs.Elements())
+                {
+                    XElement? path = playlistSong.Element("Path");
+                    if (path != null && AreTheSame(audioFilePath, path.Value))
+                    {
+                        isDuplicate = true;
+                        break;
+                    }
+                }
+            }
+            return isDuplicate;
+        }
+
+        /// <summary>
         /// Checks if the songs at the specified locations already exist in the playlist's database. 
         /// Returns the paths that are not duplicates as a  <see langword="string"/>[].
         /// </summary>

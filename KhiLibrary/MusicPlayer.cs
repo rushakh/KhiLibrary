@@ -11,7 +11,8 @@ namespace KhiLibrary
         private static PlaybackQueue playbackQueue = new PlaybackQueue();
         private static AudioFileReader? chosenSong;
         private static WaveOutEvent AudioPlayer = new WaveOutEvent();
-        private static Equalizer equalizer = new Equalizer();
+        private static Equalizers equalizerProfiles = new Equalizers(true);
+        private static Equalizer equalizer = equalizerProfiles.EqualizerProfiles[0];
         private static bool playbackStoppedManually = false;
         private static bool isFirstTime = true;
         private static int numberOfBuffers = 3;
@@ -38,7 +39,18 @@ namespace KhiLibrary
         /// <summary>
         /// The volume of the song, 1.0 is the maximum.
         /// </summary>
-        public static float Volume { get { return desiredVolume; } set { desiredVolume = value; } }
+        public static float Volume 
+        { 
+            get 
+            { 
+                return desiredVolume;
+            } 
+            set 
+            { 
+                desiredVolume = value;
+                AudioPlayer.Volume = desiredVolume;
+            }
+        }
 
         /// <summary>
         /// Enables the looping of a single song in the queue. Enabling single song loop, will disable [queue] loop.
@@ -89,6 +101,11 @@ namespace KhiLibrary
                 UpdateEqualizer();
             }
         }
+
+        /// <summary>
+        /// A collection of Equalizer profiles. Can add or remove from it. By default the first profile (index of 0) is used.
+        /// </summary>
+        public static Equalizers EqualizerProfiles { get => equalizerProfiles; set => equalizerProfiles = value; }
 
         /// <summary>
         /// A 10 band equalizer, change the gains using its properties, then update
@@ -167,8 +184,7 @@ namespace KhiLibrary
         public static void SkipToNextSong()
         {
             try
-            {
-                //playbackQueue.CurrentSong.UnloadArt();             
+            {             
                 playbackQueue.MoveToNext();
                 PrepareAndPlayTheSong();
             }
@@ -185,7 +201,6 @@ namespace KhiLibrary
         {
             try
             {
-                //playbackQueue.CurrentSong.UnloadArt();
                 playbackQueue.MoveBack();
                 PrepareAndPlayTheSong();
             }
@@ -278,9 +293,11 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Should be called when a song is playing and the equalizer bands' gains have been updated
+        /// Should be called when a song is playing and the equalizer bands' gains have been updated. 
+        /// Only applies the equalizer to the loaded song if UseEqualizer has been set to true otherwise 
+        /// simply updates the equalizer bands.
         /// </summary>
-        private static void UpdateEqualizer()
+        public static void UpdateEqualizer()
         {
             equalizer.UpdateBands();
             int state = 1;
@@ -304,8 +321,8 @@ namespace KhiLibrary
                     AudioPlayer.Init(chosenSong);
                 }
                 if (state == 1) { AudioPlayer.Play(); }
-                else if (state == 2) 
-                { 
+                else if (state == 2)
+                {
                     AudioPlayer.Play();
                     AudioPlayer.Pause();
                 }
@@ -330,7 +347,7 @@ namespace KhiLibrary
         /// <param name="sender"></param>
         /// <param name="e"></param>
         private static void AudioPlayer_PlaybackStopped(object sender, StoppedEventArgs e)
-        {          
+        {
             if (!playbackStoppedManually)
             {
                 AudioPlayer?.Dispose();
@@ -341,13 +358,20 @@ namespace KhiLibrary
                 }
                 else if (playbackQueue.Count() > 1)
                 {
-                    playbackQueue.MoveToNext();
-                    Play();
+                    // Instead of implementing a system to keep track of played songs, will just use Exceptions as a crutch.
+                    // (the system is needed when Shuffle is enabled otherwise could just check if currentIndex was
+                    // the queue's max index before the call to MoveToNext)
+                    try
+                    {
+                        playbackQueue.MoveToNext();
+                        Play();
+                    }
+                    catch
+                    {
+                        // This means that the queue has reached the end and loop is not enabled.
+                        // For now don't  want to do anything here but might later add sth.
+                    }
                 }
-            }
-            else
-            {
-                //playbackStoppedManually = false;
             }
         }
     }

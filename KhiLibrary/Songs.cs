@@ -1,10 +1,12 @@
 ﻿
+using System.Collections;
+
 namespace KhiLibrary
 {
     /// <summary>
     /// Holds the playlist's songs and provides tools for adding and removing songs.
     /// </summary>
-    public class Songs
+    public class Songs : IList<Song>
     {
         #region fields
         private readonly string ownerPlaylistName;
@@ -16,18 +18,22 @@ namespace KhiLibrary
 
         #region properties
         // Acessors
+
         /// <summary>
         /// Returns the name of the playlist this list of songs belongs to.
         /// </summary>
         public string PlaylistName { get => ownerPlaylistName; }
+
         /// <summary>
         /// Returns the DateTime of the last time this list of songs was updated.
         /// </summary>
         internal DateTime LastUpdated { get => songsListLastUpdated; }
+
         /// <summary>
         /// Returns the sum of the durations of the songs in this list.
         /// </summary>
         internal TimeSpan TotalPlayTime { get => songsListTotalPlaytime; }
+
         /// <summary>
         /// the number of songs in the list
         /// </summary>
@@ -39,6 +45,11 @@ namespace KhiLibrary
                 else { return 0; }
             }
         }
+
+        /// <summary>
+        /// Indicates if the collection is readonly (*It's not).
+        /// </summary>
+        public bool IsReadOnly { get=>  false; }
         #endregion
 
         #region constructors
@@ -86,6 +97,8 @@ namespace KhiLibrary
         }
         #endregion
 
+        #region instanceMethods
+
         /// <summary>
         /// Returns the song with the provided index. If requested index is bigger than the number of 
         /// songs or if no song has been added yet, returns null.
@@ -125,9 +138,10 @@ namespace KhiLibrary
             }
         }
 
-        #region instanceMethods
+        IEnumerator IEnumerable.GetEnumerator() { return songs.GetEnumerator(); }
+
         /// <summary>
-        /// Returns an Enumerator that iterates through songs in Songs collection.
+        /// Returns an IEnumerator that can be used to iterates through the songs in this collection.
         /// </summary>
         /// <returns></returns>
         public IEnumerator<Song> GetEnumerator()
@@ -139,7 +153,7 @@ namespace KhiLibrary
         /// For adding an already consctructed song
         /// </summary>
         /// <param name="newSong"></param>
-        public void AddSong(Song newSong)
+        public void Add(Song newSong)
         {
             bool isDuplicate = DataFilteringTools.CheckForDuplicate(newSong, ownerPlaylistPath);
             if (!isDuplicate)
@@ -154,8 +168,8 @@ namespace KhiLibrary
         /// Adds a song to the playlist using its path.
         /// </summary>
         /// <param name="audioPath"></param>
-        public void AddSong(string audioPath)
-        {           
+        public void Add(string audioPath)
+        {
             if (InternalSettings.doNotAddDuplicateSongs)
             {
                 bool isDuplicate = DataFilteringTools.CheckIfDuplicate(audioPath, ownerPlaylistPath);
@@ -190,7 +204,7 @@ namespace KhiLibrary
         public void AddRange(string[] audioPaths , bool AddSongsInParallel = false)
         {
             var actualAudioPaths = DataFilteringTools.FilterFilesBasedOnExtention(audioPaths);
-            string[] checkedAudios;
+            string[]? checkedAudios;
             if (InternalSettings.doNotAddDuplicateSongs)
             {
                 checkedAudios = DataFilteringTools.FilterDuplicates(actualAudioPaths, ownerPlaylistPath);
@@ -279,9 +293,28 @@ namespace KhiLibrary
         }
 
         /// <summary>
+        /// Determines if the specified song exists within the collection.
+        /// </summary>
+        /// <param name="song"></param>
+        /// <returns></returns>
+        public bool Contains(Song song)
+        {
+            return songs.Contains(song);
+        }
+
+        /// <summary>
+        /// Copies the collection to a one dimensional array starting from the specified index.
+        /// </summary>
+        /// <param name="destinationArray"></param>
+        /// <param name="startingIndex"></param>
+        public void CopyTo(Song[] destinationArray, int startingIndex)
+        {
+            songs.CopyTo(destinationArray, startingIndex);
+        }
+
+        /// <summary>
         /// Finds and returns a song within the list using its Title (case insensitive), and optionally for a more accurate result, 
-        /// using its Artist and Album. *** Using Linq query seems to load lyrics and images as well which is why it is not used, 
-        /// at least not until I find a solution.
+        /// using its Artist and Album.
         /// </summary>
         /// <param name="title"></param>
         /// <param name="artist"></param>
@@ -289,33 +322,34 @@ namespace KhiLibrary
         /// <returns></returns>
         public Song? FindExact(string title, string artist, string album)
         {
+            // Using Linq query, even though its very readable, seems to introduce unnecessary overhead in this case. 
+            // This works for now while still being readable (or so I think).
+            // If you know of any alternative ways that favors performance while remaining readable, please let me know.  
             Song foundSong;
             List<Song> tempSongs = [];
             if (songs != null && songs.Count > 0)
             {
-                foreach (Song song in songs)
+                for (int i = 0; i <songs.Count; i++)
                 {
+                    Song song = songs[i];
                     if (DataFilteringTools.AreTheSame(song.Title, title) &&
                         DataFilteringTools.AreTheSame(song.Artist, artist) &&
                         DataFilteringTools.AreTheSame(song.Album, album))
                     {
                         foundSong = song;
                         return foundSong;
-                    }              
+                    }
                 }
                 return null;
             }
             else
             { return null; }
-            // If the code has reached up to here, then sth is wrong
         }
 
         /// <summary>
         /// Finds and returns a list of songs (type Song) with the specified Title or Artist. By default searches for 
         /// title (set <paramref name="isTitle"/> to false to search for artist). Set <paramref name="withExactWord"/> to 
-        /// false to also include results that contain the specified word as well. 
-        /// *** Using Linq query seems to load lyrics and images of every song in the resulting list as well
-        /// which is why it is not used, at least not until I find a solution.
+        /// false to also include results that contain the specified word as well.
         /// </summary>
         /// <param name="titleOrArtist"></param>
         /// <param name="isTitle"></param>
@@ -323,8 +357,12 @@ namespace KhiLibrary
         /// <returns></returns>
         public List<Song>? Find(string titleOrArtist, bool isTitle = true, bool withExactWord = true)
         {
+            // Using Linq query, even though its very readable, seems to introduce unnecessary overhead in this case. 
+            // This works for now while still being readable (or so I think).
+            // If you know of any alternative ways that favors performance while remaining readable, please let me know.
             if (songs != null && songs.Count > 0)
             {
+                // A list of partial matches
                 List<Song> foundSongs = new List<Song>();
                 for (int i =0; i< songs.Count; i++)
                 {
@@ -361,7 +399,7 @@ namespace KhiLibrary
                                 foundSongs.Add(songs[i]);
                             }
                         }
-                    }                
+                    }
                 }
                 if (foundSongs.Count > 0) { return foundSongs; }
                 else { return null; }
@@ -373,69 +411,124 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Removes a song from the playlist, optionally removing it from all playlists.
+        /// Returns the index of the specified element within this collection, returns -1 if song is not found.
         /// </summary>
-        /// <param name="toBeRemovedSong"></param>
-        /// <param name="fromAllPlaylists"></param>
-        public void RemoveSong(Song toBeRemovedSong, bool fromAllPlaylists = false)
+        /// <param name="song"></param>
+        /// <returns></returns>
+        public int IndexOf (Song song)
         {
-                // Removes the song object itself from the list.
-                songs.Remove(toBeRemovedSong);
-                // To remove the song info and pics from the database and the folders.
-                PlaylistTools.SongRemovalHandler(toBeRemovedSong, ownerPlaylistName, fromAllPlaylists);
-                songsListLastUpdated = DateTime.Now;
-                calculateTotallPlaytime();
+            return songs.IndexOf (song);
         }
 
         /// <summary>
-        /// Removes a song from the playlist using its index, optionally removing it from all playlists.
+        /// Inserts the specified song at the given index.
         /// </summary>
         /// <param name="index"></param>
-        /// <param name="fromAllPlaylists"></param>
-        public void RemoveAt(int index, bool fromAllPlaylists = false)
+        /// <param name="song"></param>
+        public void Insert (int index, Song song)
         {
+            songs.Insert (index, song);
+        }
+
+        /// <summary>
+        /// Removes a song from the playlist, removes it from all playlists if removed from All Songs Playlist. 
+        /// Returns true if the song is found and completely removed from the database. A false return might indicate 
+        /// that while it was removed from the database, the thumbnail still remains.
+        /// </summary>
+        /// <param name="toBeRemovedSong"></param>
+        public bool Remove(Song toBeRemovedSong)
+        {
+            bool removeFromAllPlaylists = false;
+            bool isCompletelyRemoved = false;
+            if (this.ownerPlaylistName == "All Songs Playlist") { removeFromAllPlaylists = true; }
+            // Removes the song object itself from the list.
+            songs.Remove(toBeRemovedSong);
+            // To remove the song info and pics from the database and the folders. Will throw an
+            // exception if the song had not been saved beforehand
+            try
+            {
+                PlaylistTools.DatabaseTools.SongRemovalHandler(toBeRemovedSong, ownerPlaylistName, removeFromAllPlaylists);
+                isCompletelyRemoved = true;
+            }
+            catch
+            {
+                if (System.IO.File.Exists(toBeRemovedSong.ThumbnailPath))
+                {
+                    System.IO.File.Delete(toBeRemovedSong.ThumbnailPath);
+                }
+            }
+            songsListLastUpdated = DateTime.Now;
+            calculateTotallPlaytime();
+            return isCompletelyRemoved;
+        }
+
+        /// <summary>
+        /// Removes a song from the playlist using its index, will remove it from all playlists, if is removed 
+        /// from the All Songs Playlist.
+        /// </summary>
+        /// <param name="index"></param>
+        public void RemoveAt(int index)
+        {
+            bool removeFromAllPlaylists = false;
+            if (this.ownerPlaylistName == "All Songs Playlist") { removeFromAllPlaylists = true; }
             Song toBeRemovedSong = songs[index];
-            PlaylistTools.SongRemovalHandler(toBeRemovedSong, ownerPlaylistName, fromAllPlaylists);
+            // To remove the song info and pics from the database and the folders. Will throw an
+            // exception if the song had not been saved beforehand
+            try
+            {
+                PlaylistTools.DatabaseTools.SongRemovalHandler(toBeRemovedSong, ownerPlaylistName, removeFromAllPlaylists);
+            }
+            catch 
+            {
+                if (System.IO.File.Exists(toBeRemovedSong.ThumbnailPath))
+                {
+                    System.IO.File.Delete(toBeRemovedSong.ThumbnailPath);
+                }
+            }
             songsListLastUpdated = DateTime.Now;
             songs.RemoveAt(index);
         }
 
         /// <summary>
         /// Sorts the songs inside the collection based on their Title (0), Artist (1), Album (2), 
-        /// Duration(3), Genre(4), TrackNumber (5).
+        /// Duration(3), Genre(4), TrackNumber (5), and PlayedCount (6). Sorts into ascending order 
+        /// by default, can be changed to descending.
         /// </summary>
+        /// <param name="columnNumber"></param>
+        /// <param name="ascending"></param>
         /// <returns></returns>
-        public Songs Sort(int columnNumber)
+        public Songs Sort(int columnNumber, bool ascending = true)
         {
-            Song[] toBeSortedPlaylist = ToArray();
             switch (columnNumber)
             {
                 case 0:
                     songs.Sort((x, y) => x.Title.CompareTo(y.Title));
                     break;
-
                 case 1:
                     songs.Sort((x, y) => x.Artist.CompareTo(y.Artist));
                     break;
-
                 case 2:
                     songs.Sort((x, y) => x.Album.CompareTo(y.Album));
                     break;
-
                 case 3:
                     songs.Sort((x, y) => x.Duration.CompareTo(y.Duration));
                     break;
-
                 case 4:
                     songs.Sort((x, y) => x.Genres.CompareTo(y.Genres));
                     break;
                 case 5:
                     songs.Sort((x, y) => x.TrackNumber.CompareTo(y.TrackNumber));
                     break;
-
+                case 6:
+                    songs.Sort((x, y) => x.PlayedCount.CompareTo(y.PlayedCount));
+                    break;
                 default:
                     songs.Sort((x, y) => x.Title.CompareTo(y.Title));
                     break;
+            }
+            if (!ascending)
+            {
+                songs.Reverse();
             }
             return this;
         }

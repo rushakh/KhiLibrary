@@ -151,7 +151,7 @@ namespace KhiLibrary
         internal static bool IsAcceptablePlaylistName(string playlistName)
         {
             bool isAcceptable = true;
-            char[] unacceptableChars = ['/', '\\', ':', '*', '?', '\"', '<', '>', '|'];
+            char[] unacceptableChars = ['/', '\\', ':', '*', '?', '\"', '<', '>', '|', '_'];
             foreach (char c in unacceptableChars)
             {
                 if (playlistName.Contains(c))
@@ -161,7 +161,7 @@ namespace KhiLibrary
                 }
             }
             // If there already exists a database by this name, returns false
-            if (PlaylistTools.PlaylistAlreadyExists(playlistName)) { isAcceptable = false; }
+            if (PlaylistTools.Records.PlaylistAlreadyExists(playlistName)) { isAcceptable = false; }
             return isAcceptable;
         }
 

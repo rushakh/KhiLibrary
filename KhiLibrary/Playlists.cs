@@ -1,13 +1,11 @@
-﻿using System.Xml.Linq;
-
+﻿
 namespace KhiLibrary
 {
     /// <summary>
     /// An object containing a collection of Playlist objects.
     /// </summary>
-    public class Playlists
+    public class Playlists : IList<Playlist>
     {
-        //private int count;
         private List<Playlist> playlistsList;
 
         /// <summary>
@@ -21,6 +19,53 @@ namespace KhiLibrary
         public List<Playlist> PlaylistsList { get => playlistsList; }
 
         /// <summary>
+        /// The default playlist where all songs are added to at first.
+        /// </summary>
+        public Playlist AllSongs
+        {
+            get
+            {
+                try
+                {
+                    Playlist allSongsPlaylist = this["All Songs"];
+                    return allSongsPlaylist;
+                }
+                catch (KeyNotFoundException)
+                {
+                    playlistsList.Add(new Playlist("All Songs"));
+                    Playlist allSongsPlaylist = this["All Songs"];
+                    return allSongsPlaylist;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Returns the Favorites playlists which contains the songs marked as favorite.
+        /// </summary>
+        public Playlist Favorites
+        {
+            get
+            {
+                try
+                {
+                    Playlist favoriteSongsPlaylist = this["Favorites"];
+                    return favoriteSongsPlaylist;
+                }
+                catch (KeyNotFoundException)
+                {
+                    playlistsList.Add(new Playlist("Favorites"));
+                    Playlist favoriteSongsPlaylist = this["Favorites"];
+                    return favoriteSongsPlaylist;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Indicates whether the collection is readonly (it's not).
+        /// </summary>
+        public bool IsReadOnly {  get => false;}
+
+        /// <summary>
         /// Constructs an empty collection to contain Playlist objects.
         /// </summary>
         public Playlists(bool loadExistingPlaylists = false)
@@ -30,21 +75,38 @@ namespace KhiLibrary
             if (loadExistingPlaylists)
             {
                 LoadExistingDatabases();
-                if (playlistsList == null || playlistsList.Count == 0)
+                bool allSongPlaylistExists = false;
+                bool favoritePlaylistExists = false;
+                foreach (Playlist playlist in playlistsList)
                 {
-                    Playlist allSongsPlaylist = new Playlist("All Songs Playlist");
+                    if (playlist.Name == "All Songs") { allSongPlaylistExists = true; }
+                    if (playlist.Name == "Favorites") { favoritePlaylistExists = true; }
+                }
+                if (!allSongPlaylistExists)
+                {
+                    Playlist allSongsPlaylist = new Playlist("All Songs");
                     playlistsList.Add(allSongsPlaylist);
+                }
+                if (!favoritePlaylistExists)
+                {
+                    Playlist favorites = new Playlist("Favorites");
+                    playlistsList.Add(favorites);
                 }
             }
             else
             {
-                Playlist allSongsPlaylist = new Playlist("All Songs Playlist");
+                Playlist allSongsPlaylist = new Playlist("All Songs");
+                Playlist favorites = new Playlist("Favorites");
                 playlistsList.Add(allSongsPlaylist);
+                playlistsList.Add(favorites);
             }
             InternalSettings.CreateDirectories();
         }
 
         #region instanceMethods
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() { return playlistsList.GetEnumerator(); }
+
         /// <summary>
         /// Returns an Enumerator that iterates through playlists in this Playlists collection.
         /// </summary>
@@ -53,45 +115,39 @@ namespace KhiLibrary
         {
             return playlistsList.GetEnumerator();
         }
+
         /// <summary>
-        /// Returns the playlist with the provided index. If requested index is bigger than the number of 
-        /// playlists or if no playlist has been added yet, returns null.
+        /// Returns the playlist with the provided index. Throws exceptions if trying to set default 
+        /// playlists (e.g., All Songs, Favorites).
         /// </summary>
         /// <param name="index"></param>
         /// <returns></returns>
         /// <exception cref="InvalidOperationException"></exception>
         /// <exception cref="ArgumentException"></exception>
-        public Playlist? this[int index]
+        public Playlist this[int index]
         {
             get
             {
-                try
-                {
-                    if (playlistsList != null && playlistsList.Count >= index)
-                    {
-                        return playlistsList[index];
-                    }
-                    else
-                    {
-                        return null;
-                    }
-                }
-                catch
-                {
-                    return null;
-                }
+                return playlistsList[index];
             }
             set
             {
-                if (value is not null && value is Playlist)
+                if (value is not null && !value.isDefaultPlaylist)
                 {
                     if (playlistsList != null && playlistsList.Count >= index)
                     {
-                        playlistsList[index] = value;
+                        if (playlistsList[index].isDefaultPlaylist)
+                        {
+                            throw new InvalidOperationException("Cannot Edit or Remove default playlists");
+                        }
+                        else
+                        {
+                            playlistsList[index] = value;
+                        }
                     }
                     else
                     {
-                        throw new InvalidOperationException("Index is out of range.");
+                        throw new ArgumentOutOfRangeException ("Index is out of range.");
                     }
                 }
                 else
@@ -102,33 +158,48 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Indexer -Returns the playlist with the provided string as Name. If requested Playlist does not exist 
-        /// returns null.
+        /// Returns the playlist with the provided string as Name. Throws exception If requested Playlist
+        /// does not exist or when trying to set default playlists.
         /// </summary>
-        /// <param name="name"></param>
+        /// <param name="playlistName"></param>
         /// <returns></returns>
-        /// <exception cref="ArgumentOutOfRangeException"></exception>
-        public Playlist? this[string name]
+        /// <exception cref="KeyNotFoundException"></exception>
+        /// <exception cref="InvalidOperationException"></exception>
+        public Playlist this[string playlistName]
         {
             get
             {
-                var tempFoundPlaylist = FindPlaylist(name);
-                return tempFoundPlaylist;
+                var tempFoundPlaylist = this.Find(playlistName);
+                if (tempFoundPlaylist != null)
+                {
+                    return tempFoundPlaylist;
+                }
+                else
+                {
+                    throw new KeyNotFoundException ("A Playlist with the name <" + playlistName + "> does not exist within the collection.");
+                }
             }
             set
             {
-                var index = playlistsList.FindIndex(s => s.Name == name);
+                var index = playlistsList.FindIndex(s => s.Name == playlistName);
                 if (index != -1)
                 {
-                    var foundPlaylist = FindPlaylist(name);
+                    var foundPlaylist = this.Find(playlistName);
                     if (foundPlaylist != null)
                     {
-                        playlistsList[index] = foundPlaylist;
+                        if (foundPlaylist.isDefaultPlaylist)
+                        {
+                            throw new InvalidOperationException("Cannot Edit or Remove default playlists");
+                        }
+                        else
+                        {
+                            playlistsList[index] = foundPlaylist;
+                        }
                     }
                 }
                 else
                 {
-                    throw new ArgumentOutOfRangeException("A playlist with the specified "+ name +" does not exist.");
+                    throw new KeyNotFoundException("A Playlist with the name <" + playlistName + "> does not exist within the collection.");
                 }
             }
         }
@@ -139,12 +210,12 @@ namespace KhiLibrary
         public void LoadExistingDatabases()
         {
             playlistsList.Clear();
-            var existingPlaylists = PlaylistTools.ReadPlaylistsRecords();
+            var existingPlaylists = PlaylistTools.Records.ReadPlaylistsRecords();
             if (existingPlaylists != null && existingPlaylists.Count > 0)
             {
                 foreach (var pList in existingPlaylists)
                 {
-                    var tempSongs = PlaylistTools.PlaylistReader(pList.Key, pList.Value);
+                    var tempSongs = PlaylistTools.DatabaseTools.PlaylistReader(pList.Key, pList.Value);
                     if (tempSongs != null)
                     {
                         Songs newSongs = new Songs(tempSongs, pList.Key, pList.Value);
@@ -155,21 +226,10 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// If there exists previously made and saved playlists, will load them into this instance
-        /// </summary>
-        public async void LoadExistingDatabasesAsync()
-        {
-            await Task.Run(() =>
-            {
-                LoadExistingDatabases();
-            });
-        }
-
-        /// <summary>
         /// Creates and adds a database with the specified name to the database.
         /// </summary>
         /// <param name="playlistName"></param>
-        public void AddPlaylist(string playlistName)
+        public void Add(string playlistName)
         {
             if (DataFilteringTools.IsAcceptablePlaylistName(playlistName))
             {
@@ -183,7 +243,7 @@ namespace KhiLibrary
         /// Adds an already constructed playlist to the list.
         /// </summary>
         /// <param name="newPlaylist"></param>
-        public void AddPlaylist(Playlist newPlaylist)
+        public void Add(Playlist newPlaylist)
         {
             playlistsList.Add(newPlaylist);
         }
@@ -214,14 +274,36 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Search for a playlist by its name (case insensitive).
+        /// Determines if the specified element exists within the collections.
+        /// </summary>
+        /// <param name="playlist"></param>
+        /// <returns></returns>
+        public bool Contains (Playlist playlist)
+        {
+            return playlistsList.Contains(playlist);
+        }
+
+        /// <summary>
+        /// Copies the collection to the mentioned array starting from the given index.
+        /// </summary>
+        /// <param name="destinationArray"></param>
+        /// <param name="startingIndex"></param>
+        public void CopyTo(Playlist[] destinationArray, int startingIndex)
+        {
+            playlistsList.CopyTo(destinationArray, startingIndex);
+        }
+
+        /// <summary>
+        /// Searches for a playlist by its exact name and returns it. Returns null if no 
+        /// playlist by that name is found.
         /// </summary>
         /// <param name="playlistName"></param>
         /// <returns></returns>
-        public Playlist? FindPlaylist(string playlistName)
+        public Playlist? Find(string playlistName)
         {
-            foreach (var playlist in playlistsList)
+            for (int i = 0; i < playlistsList.Count; i++)
             {
+                Playlist playlist = playlistsList[i];
                 if (playlist.Name == playlistName)
                 {
                     return playlist;
@@ -260,7 +342,7 @@ namespace KhiLibrary
             (string importedPlaylistName, string[] importedPlaylistSongsPaths) = KhiUtils.ExtractSongsPathsFromM3uPlaylist(m3uOrM3u8FilePath);
             string tempDatabaseName = importedPlaylistName.Trim(' ');
             string playlistDatabasePath = InternalSettings.playlistsFolder + tempDatabaseName + ".xml";
-            // Just in case a playlist with that name already exists
+            // Just in case a playlist with that name already exists.
             int i = 0;
             while (System.IO.File.Exists(playlistDatabasePath))
             {
@@ -272,6 +354,7 @@ namespace KhiLibrary
             Songs importedPlaylistSongs = new Songs(importedPlaylistName, playlistDatabasePath);
             importedPlaylistSongs.AddRange(importedPlaylistSongsPaths);
             Playlist newImportedPlaylist = new Playlist(importedPlaylistSongs, importedPlaylistName, playlistDatabasePath);
+            playlistsList.Add(newImportedPlaylist);
         }
 
         /// <summary>
@@ -301,12 +384,71 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Remove
+        /// Returns the index of the specified playlist (first occurrence). Returns -1 if the specified element does not exists.
+        /// </summary>
+        /// <param name="playlist"></param>
+        /// <returns></returns>
+        public int IndexOf(Playlist playlist)
+        {
+            return playlistsList.IndexOf(playlist);
+        }
+
+        /// <summary>
+        /// Inserts the given playlist into the collection at the specified index.
+        /// </summary>
+        /// <param name="destinationIndex"></param>
+        /// <param name="playlist"></param>
+        public void Insert (int destinationIndex, Playlist playlist)
+        {
+            playlistsList.Insert(destinationIndex, playlist);
+        }
+
+        /// <summary>
+        /// Removes the specified playlist from the collection. Will throw an exception if the playlist is 
+        /// one of the default playlists (e.g., All Songs, Favorites).
         /// </summary>
         /// <param name="toBeRemovePlaylist"></param>
-        public async void RemovePlaylist(Playlist toBeRemovePlaylist)
+        /// <returns></returns>
+        /// <exception cref="InvalidOperationException"></exception>
+        public bool Remove(Playlist toBeRemovePlaylist)
         {
-            await Task.Run(() => playlistsList.Remove(toBeRemovePlaylist));
+            if (toBeRemovePlaylist.isDefaultPlaylist)
+            {
+                throw new InvalidOperationException("Cannot Edit or Remove default playlists");
+            }
+            else
+            {
+                return playlistsList.Remove(toBeRemovePlaylist);
+            }
+        }
+
+        /// <summary>
+        /// Removes the playlist at the specified index in the collection. Will throw an exception if the playlist is 
+        /// one of the default playlists (e.g., All Songs, Favorites).
+        /// </summary>
+        /// <param name="index"></param>
+        /// <exception cref="InvalidOperationException"></exception>
+        public void RemoveAt(int index)
+        {
+            if (playlistsList[index].isDefaultPlaylist)
+            {
+                throw new InvalidOperationException("Cannot Edit or Remove default playlists");
+            }
+            else
+            {
+                playlistsList.RemoveAt(index);
+            }
+        }
+
+        /// <summary>
+        /// Saves all the playlists in the collection to database.
+        /// </summary>
+        public void Save()
+        {
+            foreach(Playlist playlist in playlistsList)
+            {
+                playlist.Save();
+            }
         }
 
         #endregion

@@ -1,7 +1,8 @@
-﻿namespace KhiLibrary
+﻿
+namespace KhiLibrary
 {
     /// <summary>
-    /// The gateway to using KhiLibrary
+    /// The gateway to accessing the Playlists and Songs. Can change the default locations and certain behaviors through the Settings.
     /// </summary>
     public static class MusicLibrary
     {
@@ -24,7 +25,11 @@
             /// <summary>
             /// The location of the defualt playlist database that will house all of the songs.
             /// </summary>
-            public static string AllMusicDataBase { get { return InternalSettings.allMusicDataBase; } set => InternalSettings.allMusicDataBase = value; }
+            public static string AllMusicDataBase { get { return InternalSettings.allMusicDataBase; } set => InternalSettings.allMusicDataBase = value; }          
+            /// <summary>
+            /// The location of the Favorite collection (***MIGHT NOT USE IT, WILL DECIDE LATER)
+            /// </summary>
+            public static string FavoritesDataBase { get { return InternalSettings.favoriteMusicsDataBase; } set => InternalSettings.favoriteMusicsDataBase = value; }
             /// <summary>
             /// The location of the database that contains the location of all of the playlists.
             /// </summary>

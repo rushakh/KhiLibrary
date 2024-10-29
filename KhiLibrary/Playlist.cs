@@ -1,4 +1,4 @@
-﻿using System.Xml;
+﻿using System.Drawing;
 using System.Xml.Linq;
 using Application = System.Windows.Forms.Application;
 
@@ -10,9 +10,11 @@ namespace KhiLibrary
     public class Playlist
     {
         #region fields
+        internal bool isDefaultPlaylist;
         private string playlistName;
         private string playlistPath;
-        private DateTime creationDate;
+        private string playlistThumbnailPath;
+        //private DateTime creationDate;
         private DateTime lastUpdated;
         private Songs songsList;
         #endregion
@@ -30,10 +32,18 @@ namespace KhiLibrary
             }
             set
             {
-                if (value is not null && value is string)
+                if (value is not null && !isDefaultPlaylist)
                 {
-                    var temp = SetPlaylistName(value);
-                    if (temp != null) { playlistName = temp; }
+                    var temp = (PlaylistTools.DatabaseTools.EditPlaylistName(value, playlistName, playlistPath));
+                    if (temp != null)
+                    {
+                        playlistName = temp;
+                        playlistPath = InternalSettings.playlistsFolder + value + ".xml";
+                    }
+                }
+                else if (isDefaultPlaylist)
+                {
+                    throw new InvalidOperationException("Cannot Edit or Remove default playlists");
                 }
             }
         }
@@ -41,17 +51,44 @@ namespace KhiLibrary
         /// <summary>
         /// Returns the location of the playlist's xml database.
         /// </summary>
-        public string Path { get => playlistPath; set => playlistPath = value; }
+        public string Path { get => playlistPath; }
+
+        /// <summary>
+        /// The path to the thumbnail used for this playlist. If changed, will copy the image 
+        /// in the new location to the default location.
+        /// </summary>
+        public string ThumbnailPath
+        {
+            get
+            {
+                return playlistThumbnailPath;
+            }
+            set
+            {
+                string newImagePath = value;
+                if (System.IO.File.Exists(newImagePath))
+                {
+                    Image newThumbnail = Image.FromFile(newImagePath);
+                    if (System.IO.File.Exists(playlistThumbnailPath))
+                    {
+                        System.IO.File.Delete(playlistThumbnailPath);
+                    }
+                    newThumbnail.Save(playlistThumbnailPath, System.Drawing.Imaging.ImageFormat.Png);
+                    newThumbnail.Dispose();
+                }
+            }
+        }
 
         /// <summary>
         /// Returns the sum of the songs' duration 
         /// </summary>
         public TimeSpan TotalPlayTime { get => songsList.TotalPlayTime; }
 
+        // This is Not completely removed for now as I might reuse this 
         /// <summary>
         /// The date that the playlist was created on.
         /// </summary>
-        public DateTime CreationDate { get => creationDate; }
+        //public DateTime CreationDate { get => creationDate; }
 
         /// <summary>
         /// Returns the last datetime in which the playlist was updated.
@@ -62,37 +99,78 @@ namespace KhiLibrary
         /// The collection of Songs in the playlist.
         /// </summary>
         public Songs Songs { get => songsList; }
+
+        /// <summary>
+        /// Gets or sets the thumbnail used for this playlist, if there are no thumbnails specified, uses the 
+        /// default khiplayer image.
+        /// </summary>
+        public Image Thumbnail
+        {
+            get
+            {
+                if (System.IO.File.Exists(playlistThumbnailPath))
+                {
+                    return SongInfoTools.FetchSongInfo.GetThumbnail(playlistThumbnailPath);
+                }
+                else
+                {
+                    return KhiLibrary.Resources.Khi_Player_Thumbnail;
+                }
+            }
+            set
+            {
+                if (value is not null)
+                {
+                    Image newThumbnail = value;
+                    string newThumbnailPath = InternalSettings.playlistsFolder + playlistName + ".png";
+                    if (System.IO.File.Exists(playlistThumbnailPath))
+                    {
+                        System.IO.File.Delete(playlistThumbnailPath);
+                    }
+                    newThumbnail.Save(playlistThumbnailPath, System.Drawing.Imaging.ImageFormat.Png);
+                    playlistThumbnailPath = newThumbnailPath;
+                    newThumbnail.Dispose();
+                }
+            }
+        }
         #endregion 
 
         #region constructors
         /// <summary>
-        /// Creates an empty instance of the Playlist Class. Do not use this in Normal circumstances
+        /// Creates an empty instance of the Playlist Class without a database. Do not use this in Normal circumstances
         /// </summary>
         public Playlist()
         {
             playlistName = string.Empty;
             playlistPath = string.Empty;
-            creationDate = DateTime.Now;
+            //creationDate = DateTime.Now;
             lastUpdated = DateTime.Now;
             songsList = new Songs();
+            playlistThumbnailPath = InternalSettings.playlistsFolder + playlistName + ".png";
         }
 
         /// <summary>
-        /// Creates a playlist.
+        /// Creates a playlist with the provided name. Throws an exception if a playlist with that 
+        /// name already exists. 
         /// </summary>
         /// <param name="name"></param>
         public Playlist(string name)
         {
-            if (!PlaylistTools.PlaylistAlreadyExists(name))
+            if (!PlaylistTools.Records.PlaylistAlreadyExists(name))
             {
                 playlistName = name;
                 // To Remove spaces from the name so a file with that name can be created.
-                //string tempDatabaseName = name.Trim(' ');
                 playlistPath = InternalSettings.playlistsFolder + playlistName + ".xml";
-                creationDate = DateTime.Now;
+                //creationDate = DateTime.Now;
                 lastUpdated = DateTime.Now;
                 songsList = new Songs(playlistName, playlistPath);
+                playlistThumbnailPath = InternalSettings.playlistsFolder + playlistName + ".png";
                 CreatePlaylist();
+                
+                if (playlistName == "All Songs" || playlistName == "Favorites")
+                {
+                    isDefaultPlaylist = true;
+                }
             }
             else
             {
@@ -101,23 +179,39 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Creates a playlist by using an already constructed Songs object, and a name and path 
-        /// of the playlist. This is mainly used for loading existing playlists from the database.
+        /// Creates a playlist by using an already constructed Songs object, a name, and path (database) 
+        /// of the playlist. This is mainly used for loading existing playlists from the database and hence a 
+        /// database is not created for it by default but <c>Save()</c> can be manually called.
         /// </summary>
         /// <param name="listOfSongs"></param>
         /// <param name="name"></param>
         /// <param name="path"></param>
+        /// <exception cref="FileNotFoundException"></exception>
         public Playlist(Songs listOfSongs, string name, string path)
         {
-            playlistName = name;
-            playlistPath = path;
-            // Should include these two as Attributes in the database
-            creationDate = DateTime.Now;
-            lastUpdated = DateTime.Now;
-            songsList = listOfSongs;
-            if (!InternalSettings.prepareForVirtualMode)
+            // First will check if the file exists even though it's not needed at this stage,
+            // because it can lead to confusing Exceptions later on. 
+            if (System.IO.File.Exists(path))
             {
-                PrepareSongsArts();
+                playlistName = name;
+                playlistPath = path;
+                // Should include these two as Attributes in the database
+                //creationDate = DateTime.Now;
+                lastUpdated = DateTime.Now;
+                songsList = listOfSongs;
+                playlistThumbnailPath = InternalSettings.playlistsFolder + playlistName + ".png";
+                if (playlistName == "All Songs" || playlistName == "Favorites")
+                {
+                    isDefaultPlaylist = true;
+                }
+                if (!InternalSettings.prepareForVirtualMode)
+                {
+                    PrepareSongsArts();
+                }
+            }
+            else
+            {
+                throw new FileNotFoundException("The file does not exist at the specified location.");
             }
         }
         #endregion
@@ -154,7 +248,7 @@ namespace KhiLibrary
         /// </summary>
         public void Reload()
         {
-            var tempSongList = PlaylistTools.PlaylistReader(playlistName, playlistPath);
+            var tempSongList = PlaylistTools.DatabaseTools.PlaylistReader(playlistName, playlistPath);
             if (tempSongList != null)
             {
                 Songs newSongs = new Songs(tempSongList, playlistName, playlistPath);
@@ -162,7 +256,7 @@ namespace KhiLibrary
                 songsList = newSongs;
             }
             else
-            { throw new Exception("An Error was encountered reading from the playlist Database"); }
+            { throw new Exception("An unknown error was encountered reading from the playlist Database"); }
         }
 
         /// <summary>
@@ -180,53 +274,42 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Disposes the loaded album arts of the songs collection and clears memory.
+        /// Deletes the playlist and its database. It will throw an exception If called 
+        /// using All Songs playlist or Favorites.
         /// </summary>
-        /// <param name="deleteTempImages"></param>
-        public void UnloadSongArts(bool deleteTempImages = false)
+        /// <exception cref="InvalidOperationException"></exception>
+        public void Remove()
         {
-            for (int i = 0; i < songsList.Count; i++)
-            {
-                var song = songsList[i];
-                song.UnloadArt(deleteTempImages);
-            }
-            GC.WaitForPendingFinalizers();
-            int gen = GC.MaxGeneration;
-            GC.Collect(gen, GCCollectionMode.Aggressive);
-        }
-
-        /// <summary>
-        /// Deletes the playlist.
-        /// </summary>
-        public async void Remove()
-        {
-            await Task.Run(() =>
+            if (!isDefaultPlaylist)
             {
                 songsList.Clear();
-                RemovePlaylist(playlistPath);
-                playlistName = string.Empty;
-                playlistPath = string.Empty;
-                lastUpdated = DateTime.Now;
-            });
+                PlaylistTools.DatabaseTools.PlaylistRemovalHandler(playlistName, playlistPath);
+            }
+            else
+            {
+                throw new InvalidOperationException("Cannot Edit or Remove default playlists");
+            }
         }
 
         /// <summary>
-        /// Clears the songs that exists in the playlist and optionally removes them from the playlist.
+        /// Clears the songs that exists in the playlist (from the database as well).
         /// </summary>
-        public void Clear(bool removeAllSongs)
+        public void Clear()
         {
-            // Could also add the option of removing all of the songs
             songsList.Clear();
+            PlaylistTools.DatabaseTools.PlaylistWriter(playlistPath, playlistName, songsList.ToArray());
         }
 
         /// <summary>
         /// Sorts the songs inside the playlist based on their Title (0), Artist (1), Album (2),
-        /// Duration(seconds)(3), and Genre(4).
+        /// Duration(seconds)(3), Genre(4), TrackNumber (5), and PlayedCount (6). Sorts into ascending order by default 
+        /// but can be changed to descending.
         /// </summary>
         /// <param name="columnNumber"></param>
-        public void Sort(int columnNumber)
+        /// /// <param name="ascending"></param>
+        public void Sort(int columnNumber, bool ascending = true)
         {
-            songsList = songsList.Sort(columnNumber);
+            songsList = songsList.Sort(columnNumber, ascending);
         }
 
         /// <summary>
@@ -234,60 +317,22 @@ namespace KhiLibrary
         /// </summary>
         public void Save()
         {
-            PlaylistTools.PlaylistWriter(playlistPath, playlistName, songsList.ToArray());
+            PlaylistTools.DatabaseTools.PlaylistWriter(playlistPath, playlistName, songsList.ToArray());
             lastUpdated = DateTime.Now;
         }
         #endregion
 
-        #region privateInnerWorkings
-
-        /// <summary>
-        /// Use to Change the name of the playlist (both the database file and the mentioned name within it).
-        /// </summary>
-        /// <param name="newPlaylistName"></param>
-        /// <returns></returns>
-        private string? SetPlaylistName(string newPlaylistName)
-        {
-            if (DataFilteringTools.IsAcceptablePlaylistName(newPlaylistName))
-            {
-                try
-                {
-                    string tempNewPlaylistPath = Application.StartupPath + newPlaylistName + ".xml";
-                    XmlDocument playlistDatabase = new();
-                    XmlElement? rootEle;
-                    playlistDatabase.LoadXml(playlistPath);
-                    rootEle = playlistDatabase.DocumentElement;
-                    if (rootEle != null) { rootEle.SetAttribute("playlistName", newPlaylistName); }
-                    System.IO.File.Move(playlistPath, tempNewPlaylistPath);
-                    return newPlaylistName;
-                }
-                catch
-                { return playlistName; }
-            }
-            else { return null; }
-        }
+        #region privateInnerWorkings     
 
         /// <summary>
         /// To create an empty Xml for this playlist
         /// </summary>
         private void CreatePlaylist()
         {
-            XDocument playlistDatabase = PlaylistTools.DatabaseElementCreator(playlistPath, playlistName, songsList.ToArray());
-            PlaylistTools.XmlWritingTool(playlistDatabase, playlistPath);
-            PlaylistTools.PlaylistRecorder(playlistName, playlistPath);
-        }
-
-        /// <summary>
-        /// Removes the database of a playlist by using the provided path.
-        /// </summary>
-        /// <param name="playlistPath"></param>
-        private static void RemovePlaylist(string playlistPath)
-        {
-            var temp = playlistPath.Split('.', StringSplitOptions.None);
-            if (System.IO.File.Exists(playlistPath) && DataFilteringTools.AreTheSame (temp.Last(), "xml", true))
-            {
-                System.IO.File.Delete(playlistPath);
-            }
+            InternalSettings.CreateDirectories();
+            XDocument playlistDatabase = PlaylistTools.DatabaseTools.PopulateDatabase(playlistPath, playlistName, songsList.ToArray());
+            PlaylistTools.DatabaseTools.XmlWritingTool(playlistDatabase, playlistPath);
+            PlaylistTools.Records.PlaylistRecorder(playlistName, playlistPath);
         }
         #endregion
     }

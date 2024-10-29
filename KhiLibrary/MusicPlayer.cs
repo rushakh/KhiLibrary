@@ -41,12 +41,12 @@ namespace KhiLibrary
         /// </summary>
         public static float Volume 
         { 
-            get 
-            { 
+            get
+            {
                 return desiredVolume;
-            } 
-            set 
-            { 
+            }
+            set
+            {
                 desiredVolume = value;
                 AudioPlayer.Volume = desiredVolume;
             }
@@ -57,7 +57,10 @@ namespace KhiLibrary
         /// </summary>
         public static bool EnableSingleSongLoop
         {
-            get => enableSingleSongLoop;
+            get
+            {
+                return enableSingleSongLoop;
+            }
             set
             {
                 enableSingleSongLoop = value;
@@ -73,7 +76,10 @@ namespace KhiLibrary
         /// </summary>
         public static bool EnableLoop
         {
-            get => playbackQueue.EnableLoop;
+            get
+            {
+                return playbackQueue.EnableLoop;
+            }
             set
             {
                 playbackQueue.EnableLoop = value;
@@ -152,9 +158,9 @@ namespace KhiLibrary
                 if (System.IO.File.Exists(audioFilePath))
                 {
                     Song unincorporatedAudio = new Song(audioFilePath, true);
-                    Queue.ClearQueue();
+                    Queue.Clear();
                     Queue.AddToQueue(unincorporatedAudio);
-                    Queue.MoveToNext();                  
+                    Queue.MoveToNext();
                     PrepareAndPlayTheSong();
                 }
             }
@@ -184,7 +190,7 @@ namespace KhiLibrary
         public static void SkipToNextSong()
         {
             try
-            {             
+            {
                 playbackQueue.MoveToNext();
                 PrepareAndPlayTheSong();
             }

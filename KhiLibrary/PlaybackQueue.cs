@@ -31,7 +31,7 @@ namespace KhiLibrary
         /// <summary>
         /// The current index that will be used for selecting current Song.
         /// </summary>
-        internal int CurrentUnadultratedIndex { get { return currentIndex; } }
+        public int CurrentUnAdultratedIndex { get { return currentIndex; } }
 
         /// <summary>
         /// Enables shuffle mode for the queue, shuffling the songs in the queue.
@@ -59,10 +59,7 @@ namespace KhiLibrary
         internal bool EnableLoop
         {
             get => enableLoop;
-            set
-            {
-                enableLoop = value;
-            }
+            set => enableLoop = value;
         }
 
         /// <summary>
@@ -85,6 +82,9 @@ namespace KhiLibrary
             }
         }
 
+        /// <summary>
+        /// Internal constructor that initializes and sets the default values.
+        /// </summary>
         internal PlaybackQueue()
         {
             songsQueue = new List<Song>();
@@ -95,6 +95,15 @@ namespace KhiLibrary
             enableShuffle = false;
             isShuffled = false;
             currentSong = new Song();
+        }
+
+        /// <summary>
+        /// Returns an IEnumerator that can be used to iterates through the songs in this queue.
+        /// </summary>
+        /// <returns></returns>
+        public IEnumerator<Song> GetEnumerator()
+        {
+            return songsQueue.GetEnumerator();
         }
 
         /// <summary>
@@ -140,7 +149,7 @@ namespace KhiLibrary
         /// <summary>
         /// Clears the items in the queue.
         /// </summary>
-        public void ClearQueue ()
+        public void Clear ()
         {
             songsQueue.Clear();
             randomIndices = Array.Empty<int>();
@@ -156,6 +165,16 @@ namespace KhiLibrary
         public int Count ()
         {
             return songsQueue.Count;
+        }
+
+        /// <summary>
+        /// Determines if a specific song exists within the queue.
+        /// </summary>
+        /// <param name="specificSong"></param>
+        /// <returns></returns>
+        public bool Contains (Song specificSong)
+        {
+            return songsQueue.Contains(specificSong);
         }
 
         /// <summary>
@@ -322,39 +341,43 @@ namespace KhiLibrary
         }
 
         /// <summary>
-        /// Sorts the queue based on the songs Title (0), Artist (1), Album (2), Duration(3), Genre(4), TrackNumber (5).
+        /// Sorts the queue based on the songs Title (0), Artist (1), Album (2), Duration(3), Genre(4), TrackNumber (5), 
+        /// and PlayedCount (6). Sorts into an ascending order by default, can be changed to descending.
         /// </summary>
         /// <param name="columnNumber"></param>
-        public void SortQueue(int columnNumber)
+        /// <param name="ascending"></param>
+        public void SortQueue(int columnNumber, bool ascending = true)
         {
             switch (columnNumber)
             {
                 case 0:
                     songsQueue.Sort((x, y) => x.Title.CompareTo(y.Title));
                     break;
-
                 case 1:
                     songsQueue.Sort((x, y) => x.Artist.CompareTo(y.Artist));
                     break;
-
                 case 2:
                     songsQueue.Sort((x, y) => x.Album.CompareTo(y.Album));
                     break;
-
                 case 3:
                     songsQueue.Sort((x, y) => x.Duration.CompareTo(y.Duration));
                     break;
-
                 case 4:
                     songsQueue.Sort((x, y) => x.Genres.CompareTo(y.Genres));
                     break;
                 case 5:
                     songsQueue.Sort((x, y) => x.TrackNumber.CompareTo(y.TrackNumber));
                     break;
-
+                case 6:
+                    songsQueue.Sort((x, y) => x.PlayedCount.CompareTo(y.PlayedCount));
+                    break;
                 default:
                     songsQueue.Sort((x, y) => x.Title.CompareTo(y.Title));
                     break;
+            }
+            if (!ascending)
+            {
+                songsQueue.Reverse();
             }
         }
 

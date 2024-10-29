@@ -7,7 +7,7 @@
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <Title>KhiLibrary</Title>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <IncludeSymbols>True</IncludeSymbols>
+    <IncludeSymbols>False</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
@@ -64,7 +64,7 @@
   <ItemGroup>
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="NAudio.Extras" Version="2.2.1" />
-    <PackageReference Include="z440.atl.core" Version="5.25.0" />
+    <PackageReference Include="z440.atl.core" Version="6.6.0" />
   </ItemGroup>
 
   <ItemGroup>

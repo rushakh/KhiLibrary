@@ -19,8 +19,9 @@ namespace KhiLibrary
         private int trackNumber;
         private string genres;
         private string lyrics;
-        private Image? art;
-        //private Image? thumbnail;
+        private bool isFavorite;
+        private int playedCount;
+        private DateTime addedDateTime;
 
         /// <summary>
         /// The title of the Song, returns the file name without extension if there is not title.
@@ -117,12 +118,16 @@ namespace KhiLibrary
         /// The position of this song in its album.
         /// </summary>
         public int TrackNumber 
-        { get => trackNumber; 
-            set 
-            { 
+        {
+            get
+            {
+                return trackNumber;
+            }
+            set
+            {
                 var temp = SongInfoTools.SongModifier.SetTrackNumber(value, path);
                 if (temp != null && temp != 0) { trackNumber = (int)temp; }
-            } 
+            }
         }
 
         /// <summary>
@@ -155,14 +160,14 @@ namespace KhiLibrary
         /// </summary>
         public Image Art
         {
-            get 
+            get
             {
                 if (!System.IO.File.Exists(artPath)) { PrepareArt(); }
                 return SongInfoTools.FetchSongInfo.GetArt(artPath);
             }
             set
             {
-                if (value is not null && value is Image)
+                if (value is not null)
                 {
                     SongInfoTools.SongModifier.SetArt(value, path, thumbnailPath);
                 }
@@ -175,20 +180,36 @@ namespace KhiLibrary
         public Image Thumbnail { get => SongInfoTools.FetchSongInfo.GetThumbnail(thumbnailPath); }
 
         /// <summary>
+        /// Returns true if the song has been marked as Favorite.
+        /// </summary>
+        public bool IsFavorite { get => isFavorite; set => isFavorite = value; }
+
+        /// <summary>
+        /// The number of times this song has been played (Needs to be increased and decreased manually for now).
+        /// </summary>
+        public int PlayedCount { get => playedCount; set => playedCount = value; }
+
+        /// <summary>
+        /// The date and time on which the song object was created (or when read from database, the time it was added to database).
+        /// </summary>
+        public DateTime AddedOn { get => addedDateTime; }
+
+        /// <summary>
         /// Returns a dictionary with the song's metadata and embedded information. Returns null in case of exception.
         /// </summary>
         public Dictionary<string, object?>? Properties 
-        { 
-            get 
+        {
+            get
             {
-                return SongInfoTools.FetchSongInfo.GetProperties(path); 
+                return SongInfoTools.FetchSongInfo.GetProperties(path);
             }
         }
 
         #region constructors
         /// <summary>
-        /// An empty constructor to innitialize the fields
-        /// </summary>
+        /// An empty constructor to innitialize the fields. No need to use this other than when you need a 
+        /// place holder. ****Consider removing/ making this internal.
+        /// </summary> 
         public Song()
         {
             title = string.Empty;
@@ -201,6 +222,9 @@ namespace KhiLibrary
             genres = string.Empty;
             lyrics = string.Empty;
             trackNumber = 0;
+            IsFavorite = false;
+            playedCount = 0;
+            addedDateTime = DateTime.Now;
         }
 
         /// <summary>
@@ -249,6 +273,9 @@ namespace KhiLibrary
                     else { trackNumber = 0; }
                 }
                 else { trackNumber = 0; }
+                isFavorite = false;
+                playedCount = 0;
+                addedDateTime = DateTime.Now;
                 tempInfo = null;
                 songInfo = null;
             }
@@ -268,8 +295,12 @@ namespace KhiLibrary
         /// <param name="songDuration"></param>
         /// <param name="songGenres"></param>
         /// <param name="songTrackNumber"></param>
+        /// <param name="songIsFavorite"></param>
+        /// /// <param name="songAddedDateTime"></param>
+        /// <param name="songPlayedCount"></param>
         public Song(string songTitle, string songArtist, string songAlbum, string songPath,
-                    string songThumbnailPath, TimeSpan songDuration, string songGenres, int songTrackNumber)
+                    string songThumbnailPath, TimeSpan songDuration, string songGenres,
+                    int songTrackNumber, bool songIsFavorite, DateTime songAddedDateTime, int songPlayedCount)
         {
             title = songTitle;
             artist = songArtist;
@@ -283,6 +314,9 @@ namespace KhiLibrary
             // Lyrics will be loaded from file
             lyrics = string.Empty;
             trackNumber = songTrackNumber;
+            isFavorite = songIsFavorite;
+            playedCount = songPlayedCount;
+            addedDateTime = songAddedDateTime;
         }
         #endregion
 
@@ -299,7 +333,7 @@ namespace KhiLibrary
             {
                 try
                 {
-                    if (index <= 10)
+                    if (index <= 14)
                     {
                         switch (index)
                         {
@@ -325,6 +359,12 @@ namespace KhiLibrary
                                 return Art;
                             case 10:
                                 return Thumbnail;
+                            case 11:
+                                return IsFavorite;
+                            case 12:
+                                return AddedOn;
+                            case 13:
+                                return PlayedCount;
                             default:
                                 return null;
                         }
@@ -341,9 +381,9 @@ namespace KhiLibrary
             }
             set
             {
-                if (value is not null && (value is string || value is TimeSpan || value is Image))
+                if (value is not null && (value is string || value is int || value is Image))
                 {
-                    if (index <= 10 && index >= 0)
+                    if (index <= 13 && index >= 0)
                     {
                         switch (index)
                         {
@@ -367,6 +407,12 @@ namespace KhiLibrary
                                 break;
                             case 9:
                                 Art = (Image)value;
+                                break;
+                            case 11:
+                                IsFavorite = (bool)value;
+                                break;
+                            case 13:
+                                PlayedCount = (int)value;
                                 break;
                         }
                     }
@@ -405,30 +451,6 @@ namespace KhiLibrary
             var tempArtPath = SongInfoTools.PrepareArt(path);
             if (tempArtPath != null) { artPath = tempArtPath; }
             else { artPath = string.Empty; }
-        }
-
-        /// <summary>
-        /// Disposes of the loaded album art and optionally deletes it if it exists.
-        /// </summary>
-        /// <param name="deleteTempImage"></param>
-        public void UnloadArt(bool deleteTempImage = false)
-        {
-            try
-            {
-                if (art != null)
-                {
-                    art.Dispose();
-                    art = null;
-                }
-                if (deleteTempImage)
-                {
-                    if (System.IO.File.Exists(artPath))
-                    {
-                        System.IO.File.Delete(artPath);
-                    }
-                }
-            }
-            catch { }
         }
     }
 }

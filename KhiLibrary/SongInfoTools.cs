@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.Xml;
+using System.Xml.Linq;
 using ATL;
 
 namespace KhiLibrary
@@ -190,9 +190,14 @@ namespace KhiLibrary
                 {
                     if (System.IO.File.Exists(artPath))
                     {
-                        Image tempArt = Image.FromFile(artPath);
-                        Bitmap art = new Bitmap(tempArt, tempArt.Size);
-                        tempArt.Dispose();
+                        Bitmap art;
+                        using (FileStream imageStream = new FileStream(artPath, FileMode.Open, FileAccess.Read))
+                        {
+                            Image tempArt = Image.FromStream(imageStream);
+                            art = new Bitmap(tempArt);
+                            tempArt.Dispose();
+                            imageStream.Dispose();
+                        }
                         return art;
                     }
                     else
@@ -372,6 +377,7 @@ namespace KhiLibrary
             ATL.Settings.UseFileNameWhenNoTitle = true;
             ATL.Settings.ReadAllMetaFrames = false;
             ATL.Settings.OutputStacktracesToConsole = false;
+
             string fileNameWithoutExtention = Path.GetFileNameWithoutExtension(audioFilePath);
             ATL.Track track = new ATL.Track(audioFilePath);
             title = track.Title;
@@ -379,13 +385,20 @@ namespace KhiLibrary
             album = track.Album;
             path = track.Path;
             genres = track.Genre;
+            // For Getting the duration
             var time = TimeSpan.FromMilliseconds(track.DurationMs);
             var tempTimeString = new TimeSpanConverter().ConvertToString(time);
             if (tempTimeString != null) { duration = tempTimeString; }
             else { duration = TimeSpan.Zero.ToString(); }
+            // For getting the track number
             var tempNum = track.TrackNumber;
-            if (tempNum != null) { trackNumber = tempNum.ToString(); }
+            if (tempNum != null) 
+            {
+                int num = (int)tempNum;
+                trackNumber = num.ToString();
+            }
             else { trackNumber = string.Empty; }
+            // For getting art and thumbnail
             thumbnailPath = MakeThumbnailPaths(fileNameWithoutExtention, ".png");
             if (track.EmbeddedPictures.Any() && track.EmbeddedPictures[0] is not null)
             {
@@ -448,61 +461,58 @@ namespace KhiLibrary
         {
             await Task.Run(() =>
             {
-                List<int> similarItemsIndices = [];
-                XmlElement? AllSongs;  //the document root node
-                XmlDocument? musicDatabase = new();
+                string fileName = System.IO.Path.GetFileNameWithoutExtension(toBeRemovedSong.Path);
+                string artPath = InternalSettings.tempArtsFolder + fileName + ".jpeg";
+                string songTitle = toBeRemovedSong.Title;
+                string songArtist = toBeRemovedSong.Artist;
+                string songAlbum = toBeRemovedSong.Album;
+                string songPath = toBeRemovedSong.Path;
 
-                musicDatabase.Load(playlistPath);
-                if (musicDatabase.HasChildNodes)
+                List<XElement> removalCandidates = new List<XElement>();
+                XDocument playlistDatabase = XDocument.Load(playlistPath);
+                if (playlistDatabase.Root != null)
                 {
-                    if (musicDatabase.DocumentElement?.HasChildNodes == true)
+                    XElement playlistSongs = playlistDatabase.Root;
+                    // Since duplicates might have been added to the database at some point
+                    // if the settings were changed, more than one entry for this song might exist.
+                    foreach (XElement songElement in playlistSongs.Elements())
                     {
-                        AllSongs = musicDatabase.DocumentElement;
-                        XmlNodeList AllSongsElements = AllSongs.ChildNodes;
-                        XmlNode? toBeRemovedSongElement;
-                        for (int i = 0; i < AllSongs.ChildNodes.Count; i++)
+                        if (songElement.Element("Title")?.Value == songTitle &&
+                            songElement.Element("Artist")?.Value == songTitle &&
+                            songElement.Element("Album")?.Value == songTitle &&
+                            songElement.Element("Path")?.Value == songTitle)
                         {
-                            XmlNode? removalCandidate = AllSongsElements[i];
-                            if (removalCandidate != null && removalCandidate.HasChildNodes)
-                            {
-                                var childNode = removalCandidate.ChildNodes[3];
-                                if (childNode != null && childNode.InnerText == toBeRemovedSong.Path)
-                                    similarItemsIndices.Add(i);
-                                toBeRemovedSongElement = AllSongs.ChildNodes[i];
-                                // Just to get rid of the null reference warning
-                                if (toBeRemovedSongElement != null)
-                                {
-                                    AllSongs.RemoveChild(toBeRemovedSongElement);
-                                }
-                                i--; // since the nodes will rearrange themselves, if the counter continues normally
-                                     // it will skip an item, hence the need for this
-                            }
+                            removalCandidates.Add(songElement);
                         }
-                        // To remove the pics
-                        try
-                        {
-                            //if (System.IO.File.Exists(toBeRemovedSong.ArtPath)) { System.IO.File.Delete(toBeRemovedSong.ArtPath); }
-                            if (System.IO.File.Exists(toBeRemovedSong.ThumbnailPath)) { System.IO.File.Delete(toBeRemovedSong.ThumbnailPath); }
-                        }
-                        catch
-                        {
-                            // In Case it wasn't properly disposed of 
-                            Task.Delay(3000);
-                            GC.WaitForPendingFinalizers();
-                            int gen = GC.MaxGeneration;
-                            GC.Collect(gen, GCCollectionMode.Aggressive);
-                            // Will try once again, and in case of exception, simply ignores the pictures, since they are loaded on demand
-                            // and using the path included in the database. Since the song is removed from the database, removing the pictures
-                            // is not a priority. 
-                            try
-                            {
-                                //if (System.IO.File.Exists(toBeRemovedSong.ArtPath)) { System.IO.File.Delete(toBeRemovedSong.ArtPath); }
-                                if (System.IO.File.Exists(toBeRemovedSong.ThumbnailPath)) { System.IO.File.Delete(toBeRemovedSong.ThumbnailPath); }
-                            }
-                            catch { }
-                        }
-                        musicDatabase.Save(playlistPath);
                     }
+                    foreach (XElement toRemovedElement in removalCandidates)
+                    {
+                        toRemovedElement.Remove();
+                    }
+                }
+                PlaylistTools.DatabaseTools.XmlWritingTool(playlistDatabase, playlistPath);
+                // To remove the pics
+                try
+                {
+                    if (System.IO.File.Exists(artPath)) { System.IO.File.Delete(artPath); }
+                    if (System.IO.File.Exists(toBeRemovedSong.ThumbnailPath)) { System.IO.File.Delete(toBeRemovedSong.ThumbnailPath); }
+                }
+                catch
+                {
+                    // In Case it wasn't properly disposed of 
+                    Task.Delay(3000);
+                    GC.WaitForPendingFinalizers();
+                    int gen = GC.MaxGeneration;
+                    GC.Collect(gen, GCCollectionMode.Aggressive);
+                    // Will try once again, and in case of exception, simply ignores the pictures, since they are loaded on demand
+                    // and using the path included in the database. Since the song is removed from the database, removing the pictures
+                    // is not a priority. 
+                    try
+                    {
+                        if (System.IO.File.Exists(artPath)) { System.IO.File.Delete(artPath); }
+                        if (System.IO.File.Exists(toBeRemovedSong.ThumbnailPath)) { System.IO.File.Delete(toBeRemovedSong.ThumbnailPath); }
+                    }
+                    catch { }
                 }
             });
         }

@@ -108,7 +108,7 @@ namespace KhiLibrary
         /// <summary>
         /// Deletes all the temporary images (album arts) in the temp folder.
         /// </summary>
-        internal static void ClearTemporaryImages()
+        public static void ClearTemporaryImages()
         {
             try
             {
@@ -133,7 +133,7 @@ namespace KhiLibrary
         /// </summary>
         /// <param name="audioFilesPaths"></param>
         /// <param name="artDestinationDirectory"></param>
-        internal static void AlbumArtExtractorBatch(string[] audioFilesPaths, string artDestinationDirectory)
+        public static void AlbumArtExtractorBatch(string[] audioFilesPaths, string artDestinationDirectory)
         {
             for (int i = 0; i < audioFilesPaths.Length; i++)
             {
@@ -150,7 +150,7 @@ namespace KhiLibrary
         /// </summary>
         /// <param name="audioFilePath"></param>
         /// <param name="artDestinationDirectory"></param>
-        internal static void AlbumArtExtractor(string audioFilePath, string artDestinationDirectory)
+        public static void AlbumArtExtractor(string audioFilePath, string artDestinationDirectory)
         {
             try
             {
@@ -176,6 +176,27 @@ namespace KhiLibrary
             }
             catch
             { }
+        }
+
+        /// <summary>
+        /// ***NOT YET WRITTEN. Use to read xml databases (of playlists) that have been corrupted.
+        /// </summary>
+        /// <param name="playlistPath"></param>
+        /// <returns></returns>
+        public static Playlist ReadCorruptedDatabase(string playlistPath)
+        {
+            Playlist playlist = new Playlist();
+            // I'd guess I'll have to read the xml document as sth like txt, line by line
+            // and set rules for each line --> sth like:
+            // foreach (string line in documentLines) 
+            // {
+            //      if (line.Contains(Song / Title / Album / etc))
+            //          {
+            //              string tempTitle = (string)line.Skip (the first parts of xml element);
+            //              string title = (string)tempTitle.SkipLast (the last parts of xml element) 
+            //          }
+            // }
+            return playlist;
         }
     }
 }
